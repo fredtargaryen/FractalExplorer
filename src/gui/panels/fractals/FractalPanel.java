@@ -7,16 +7,28 @@ import numbers.Complex;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.Random;
 import java.util.Stack;
 
 public class FractalPanel extends JPanel
 {
+    /**
+     * The number of iterations to perform when drawing a point.
+     */
     protected int iterations;
 
+    /**
+     * Stack of complex numbers for parsing expressions.
+     */
     private Stack<Complex> complexStack;
+
+    /**
+     * Stack of decimal numbers for parsing expressions.
+     */
     private Stack<Double> doubleStack;
+
+    /**
+     * Stack of symbols in the expression being parsed, which determine the calculations to be done.
+     */
     private Stack<Character> operatorStack;
 
     /**
@@ -25,32 +37,43 @@ public class FractalPanel extends JPanel
     private String rawInstructions;
 
     /**
-     * The instruction string, edited by the program for faster processing.
+     * The definition of the iteration sequence's first term, validated and edited by the program for faster processing.
      */
-    private String processedInstructions;
+    private String processedFirstTerm;
 
     /**
-     * Any numerical values entered in rawInstructions.
+     * The definition of the iteration sequence's next term, validated and edited by the program for faster processing.
      */
-    private double[] userDoubles;
+    private String processedNextTerm;
 
     /**
-     * The index of the first user double in the rule for the next term. Will be constant for all instruction strings,
-     * so only set once.
+     * Stores up to 10 unique strings representing user-defined numerical values.
+     * In processed instruction strings, "Dx" refers to number x in this array.
      */
-    private int firstNextTermUserDoubleIndex;
+    private Double[] userDoubles;
 
     /**
-     * Pointer to the current double being used.
+     * Stores up to 10 unique strings representing user-defined complexes.
+     * In processed instruction strings, "Cx" refers to complex number x in this array.
+     * If there is a value at position x, the complex is one that has to be recalculated for every iteration, so
+     * parseComplex(userComplexStrings[x], ...) must be called.
+     * If there is no value, the complex value is constant, so it can be acquired directly from userComplexes[x].
      */
-    private int userDoublesIndex;
+    private String[] userComplexStrings;
 
     /**
-     * If the first term contains no special complexes, it is composed of constant values and therefore only needs to
-     * be calculated once. If this is null, the first term must contain at least one special complex, and therefore
-     * needs to be recalculated.
+     * Stores up to 10 unique user-defined complex numbers, that do not need to be recalculated.
+     * At the start of each iteration there is a pattern between userComplexStrings and userComplexes:
+     * Where userComplexStrings is null, userComplexes is not null, and vice versa. A null value in userComplexStrings
+     * and a value in userComplexes shows that the complex value is persistent throughout all iterations. The opposite
+     * shows that the complex value has to be recalculated from the string every iteration. The first time the complex
+     * value is calculated, it can be stored in userComplexes and reused. At the end of the iteration these values
+     * will have to be removed; the values that need removing can be identified because their corresponding strings are
+     * not null.
      */
-    private Complex constantFirstTerm;
+    private Complex[] userComplexes;
+
+    private static final int NO_OF_ALLOWED_USER_VALUES = 10;
 
     public FractalPanel()
     {
@@ -60,7 +83,9 @@ public class FractalPanel extends JPanel
         this.doubleStack = new Stack<Double>();
         this.operatorStack = new Stack<Character>();
         this.rawInstructions = "";
-        this.firstNextTermUserDoubleIndex = -1;
+        this.userDoubles = new Double[NO_OF_ALLOWED_USER_VALUES];
+        this.userComplexStrings = new String[NO_OF_ALLOWED_USER_VALUES];
+        this.userComplexes = new Complex[NO_OF_ALLOWED_USER_VALUES];
     }
 
     /**
@@ -106,63 +131,53 @@ public class FractalPanel extends JPanel
      */
     public void paintRect(Graphics g, int rectx, int recty, int width, int height)
     {
-        String instructions = this.getProcessedInstructions();
-        if(!instructions.equals(""))
+        String firstTermString = this.getProcessedFirstTerm();
+        String nextTermString = this.getProcessedNextTerm();
+        if(!(firstTermString.equals("") || nextTermString.equals("")))
         {
             this.iterations = FractalDisplay.getMainWindow().getParamPanel().getIterations();
             Complex userSelectedPoint = FractalDisplay.getMainWindow().getTopDisplay().getLastPoint();
 
             //The Complex whose corresponding pixel is currently being coloured in the FractalPanel
-            Complex c;
+            Complex currentPoint;
 
             //The first term in the iteration sequence for this fractal
-            Complex firstTerm = this.constantFirstTerm;
+            Complex firstTerm;
 
             //The previous term in the iteration sequence for this fractal
             Complex prevSeqValue;
-
-            String[] parts = instructions.split(";");
-            String firstTermDefinition = parts[0];
-            String nextTermRule = parts[1];
 
             int iterationsManaged;
 
             //Stops the while loop if the squared modulus gets above 4
             boolean stop;
-            for (int y = recty; y < height; ++y) {
-                for (int x = rectx; x < width; ++x) {
-                    c = this.getPanelCoordsAsComplex(rectx + x, recty + y);
+            for (int y = recty; y < height; ++y)
+            {
+                for (int x = rectx; x < width; ++x)
+                {
+                    currentPoint = this.getPanelCoordsAsComplex(rectx + x, recty + y);
 
-                    this.userDoublesIndex = 0;
-                    if(this.constantFirstTerm == null)
-                    {
-                        //The first term needs to be recalculated.
-                        //First and previous terms can be null because the validation method has already been called, so
-                        //it can be assumed that the first term will make no reference to them.
-                        firstTerm = this.parseInstruction(firstTermDefinition, null, null, c, userSelectedPoint);
-                    }
-                    else
-                    {
-                        //If not, firstTerm remains equal to this.constantFirstTerm, and the index can move straight to
-                        //the next term rule.
-                        this.userDoublesIndex = this.firstNextTermUserDoubleIndex;
-                    }
+                    firstTerm = this.parseComplex(firstTermString, null, null, currentPoint, userSelectedPoint);
                     stop = false;
                     iterationsManaged = 0;
                     prevSeqValue = firstTerm.clone();
-                    if (prevSeqValue.modulusSquared() < 4) {
-                        while (iterationsManaged < this.iterations + 1 && !stop) {
+                    if (prevSeqValue.modulusSquared() < 4)
+                    {
+                        while (iterationsManaged < this.iterations + 1 && !stop)
+                        {
                             ++iterationsManaged;
                             //Uses next term rule to determine how to reach the next term
-                            prevSeqValue = this.parseInstruction(nextTermRule, prevSeqValue, firstTerm, c, userSelectedPoint);
-                            this.userDoublesIndex = firstNextTermUserDoubleIndex;
-                            if (prevSeqValue.modulusSquared() >= 4) {
+                            prevSeqValue = this.parseComplex(nextTermString, prevSeqValue, firstTerm, currentPoint, userSelectedPoint);
+                            if (prevSeqValue.modulusSquared() >= 4)
+                            {
                                 stop = true;
                             }
                         }
                     }
                     g.setColor(this.chooseColour(iterationsManaged));
-                    g.fillRect(rectx + x, recty + y, 1, 1);
+                    int paintx = rectx + x;
+                    int painty = recty + y;
+                    g.drawLine(paintx, painty, paintx, painty);
                 }
             }
         }
@@ -217,19 +232,18 @@ public class FractalPanel extends JPanel
      * @param userPoint the last point selected by the user
      * @return the Complex that is described by these instructions
      */
-    private Complex parseInstruction(String s, Complex prev, Complex first, Complex currentPoint, Complex userPoint)
+    private Complex parseComplex(String s, Complex prev, Complex first, Complex currentPoint, Complex userPoint)
     {
-        this.userDoublesIndex = 0;
         int x = 0;
         char currentChar;
         //Used by binary operators to check if they are operating on doubles or Complexes.
         //True if a double was last pushed; false if a Complex.
         boolean doubleLastPushed = true;
         int stringLength = s.length();
-        //Binary operators need to reserve the operand before them, or it will be operated on by subsequent operators.
+        //Binary operators need to protect the operand before them, or it will be operated on by subsequent operators.
         //This includes the comma.
-        int noOfReservedDoubles = 0;
-        int noOfReservedComplexes = 0;
+        int noOfProtectedDoubles = 0;
+        int noOfProtectedComplexes = 0;
         //When an item is pushed that cannot lead directly to some double or Complex processing, this is set to false
         //to minimize the number of times the program has to enter the stack loop.
         boolean enterStackLoop;
@@ -237,10 +251,42 @@ public class FractalPanel extends JPanel
         {
             enterStackLoop = true;
             currentChar = s.charAt(x);
-            if (currentChar == '$') {
-                this.doubleStack.push(this.userDoubles[this.userDoublesIndex]);
+
+            if(currentChar == 'D')
+            {
+                //There is a user-defined double here
+                ++x;
+                //The number after D is the position in userDoubles of the desired double
+                this.doubleStack.push(this.userDoubles[Integer.parseInt(s.substring(x, x + 1))]);
                 doubleLastPushed = true;
-                ++this.userDoublesIndex;
+            }
+            else if(currentChar == 'C')
+            {
+                //There is a user-defined complex here
+                ++x;
+                int complexIndex = Integer.parseInt(s.substring(x, x + 1));
+                //The number after C is the position in userComplexStrings or userComplexes of the desired complex
+                if(this.userComplexes[complexIndex] == null)
+                {
+                    //Protect all current stack items while parsing
+                    int prevCompProtect = noOfProtectedComplexes;
+                    noOfProtectedComplexes = this.complexStack.size();
+                    int prevDoubProtect = noOfProtectedDoubles;
+                    noOfProtectedDoubles = this.doubleStack.size();
+
+                    //Parse the corresponding string and store the result
+                    this.userComplexes[complexIndex] = this.parseComplex(this.userComplexStrings[complexIndex], prev, first, currentPoint, userPoint);
+                    
+                    //Stop reserving items
+                    noOfProtectedComplexes = prevCompProtect;
+                    noOfProtectedDoubles = prevDoubProtect;
+                }
+                if(this.userComplexes[complexIndex] != null)
+                {
+                    //The complex value is already calculated and available in userComplexes.
+                    this.complexStack.push(this.userComplexes[complexIndex].clone());
+                    doubleLastPushed = false;
+                }
             }
             else if (currentChar == 'p') {
                 this.complexStack.push(prev.clone());
@@ -261,18 +307,18 @@ public class FractalPanel extends JPanel
             }
             else if(currentChar == ',')
             {
-                ++noOfReservedDoubles;
+                ++noOfProtectedDoubles;
                 this.operatorStack.push(currentChar);
             }
             else if(this.isBinaryOperator(currentChar))
             {
                 if(doubleLastPushed)
                 {
-                    ++noOfReservedDoubles;
+                    ++noOfProtectedDoubles;
                 }
                 else
                 {
-                    ++noOfReservedComplexes;
+                    ++noOfProtectedComplexes;
                 }
                 this.operatorStack.push(currentChar);
             }
@@ -301,10 +347,10 @@ public class FractalPanel extends JPanel
                         if(doubleLastPushed)
                         {
                             int doubStackSize = this.doubleStack.size();
-                            if (doubStackSize > noOfReservedDoubles) {
+                            if (doubStackSize > noOfProtectedDoubles) {
                                 this.doubleStack.push(this.doubleStack.pop() + this.doubleStack.pop());
                                 this.operatorStack.pop();
-                                --noOfReservedDoubles;
+                                --noOfProtectedDoubles;
                                 --opStackSize;
                             }
                             else
@@ -314,10 +360,10 @@ public class FractalPanel extends JPanel
                         }
                         else {
                             int compStackSize = this.complexStack.size();
-                            if (compStackSize > noOfReservedComplexes) {
+                            if (compStackSize > noOfProtectedComplexes) {
                                 this.complexStack.push(this.complexStack.pop().add(this.complexStack.pop()));
                                 this.operatorStack.pop();
-                                --noOfReservedComplexes;
+                                --noOfProtectedComplexes;
                                 --opStackSize;
                             } else {
                                 exitStackLoop = true;
@@ -329,12 +375,12 @@ public class FractalPanel extends JPanel
                         if(doubleLastPushed)
                         {
                             int doubStackSize = this.doubleStack.size();
-                            if (doubStackSize > noOfReservedDoubles)
+                            if (doubStackSize > noOfProtectedDoubles)
                             {
                                 Double toSubtract = this.doubleStack.pop();
                                 this.doubleStack.push(this.doubleStack.pop() - toSubtract);
                                 this.operatorStack.pop();
-                                --noOfReservedDoubles;
+                                --noOfProtectedDoubles;
                                 --opStackSize;
                             }
                             else
@@ -343,12 +389,12 @@ public class FractalPanel extends JPanel
                             }
                         }
                         else {
-                            if (this.complexStack.size() > noOfReservedComplexes) {
+                            if (this.complexStack.size() > noOfProtectedComplexes) {
                                 Complex complexToSubtract = this.complexStack.pop();
                                 complexToSubtract = new Complex(-complexToSubtract.getRealPart(), -complexToSubtract.getImagPart());
                                 this.complexStack.push(this.complexStack.pop().add(complexToSubtract));
                                 this.operatorStack.pop();
-                                --noOfReservedComplexes;
+                                --noOfProtectedComplexes;
                                 --opStackSize;
                             } else {
                                 exitStackLoop = true;
@@ -360,10 +406,10 @@ public class FractalPanel extends JPanel
                         if(doubleLastPushed)
                         {
                             int doubStackSize = this.doubleStack.size();
-                            if (doubStackSize > noOfReservedDoubles) {
+                            if (doubStackSize > noOfProtectedDoubles) {
                                 this.doubleStack.push(this.doubleStack.pop() * this.doubleStack.pop());
                                 this.operatorStack.pop();
-                                --noOfReservedDoubles;
+                                --noOfProtectedDoubles;
                                 --opStackSize;
                             }
                             else
@@ -373,10 +419,10 @@ public class FractalPanel extends JPanel
                         }
                         else {
                             int compStackSize = this.complexStack.size();
-                            if (compStackSize > noOfReservedComplexes) {
+                            if (compStackSize > noOfProtectedComplexes) {
                                 this.complexStack.push(this.complexStack.pop().multiplyBy(this.complexStack.pop()));
                                 this.operatorStack.pop();
-                                --noOfReservedComplexes;
+                                --noOfProtectedComplexes;
                                 --opStackSize;
                             } else {
                                 exitStackLoop = true;
@@ -384,7 +430,7 @@ public class FractalPanel extends JPanel
                         }
                     }
                     else if (topOperator == 'a') {
-                        if (this.doubleStack.size() >= noOfReservedDoubles + 1) {
+                        if (this.doubleStack.size() >= noOfProtectedDoubles + 1) {
                             this.doubleStack.push(Math.abs(this.doubleStack.pop()));
                             this.operatorStack.pop();
                             --opStackSize;
@@ -392,7 +438,7 @@ public class FractalPanel extends JPanel
                             exitStackLoop = true;
                         }
                     } else if (topOperator == 'r') {
-                        if (this.complexStack.size() >= noOfReservedComplexes + 1) {
+                        if (this.complexStack.size() >= noOfProtectedComplexes + 1) {
                             this.doubleStack.push(this.complexStack.pop().getRealPart());
                             this.operatorStack.pop();
                             --opStackSize;
@@ -400,7 +446,7 @@ public class FractalPanel extends JPanel
                             exitStackLoop = true;
                         }
                     } else if (topOperator == 'i') {
-                        if (this.complexStack.size() >= noOfReservedComplexes + 1) {
+                        if (this.complexStack.size() >= noOfProtectedComplexes + 1) {
                             this.doubleStack.push(this.complexStack.pop().getImagPart());
                             this.operatorStack.pop();
                             --opStackSize;
@@ -416,7 +462,7 @@ public class FractalPanel extends JPanel
                         this.complexStack.push(new Complex(this.doubleStack.pop(), imagPart));
                         this.operatorStack.pop();
                         this.operatorStack.pop();
-                        --noOfReservedDoubles;
+                        --noOfProtectedDoubles;
                         this.operatorStack.pop();
                         opStackSize -= 3;
                     }
@@ -424,26 +470,45 @@ public class FractalPanel extends JPanel
             }
             ++x;
         }
+        for(int index = 0; index < this.userComplexStrings.length; ++index)
+        {
+            if(this.userComplexStrings[index] != null)
+            {
+                this.userComplexes[index] = null;
+            }
+        }
         return this.complexStack.pop();
     }
 
     /**
      * Checks that the raw instruction string is valid. If it is valid (i.e. no exceptions were thrown), the processed
-     * instruction is set. Any doubles from the raw instruction are placed in userDoubles and replaced with a $
-     * character.
+     * instruction is set. What constitutes a valid formula is described fully in the window displayed by the Create New
+     * Fractal Button (see FractalSelectPanel#createFractal ActionListener code).
+     *
+     * This method also adjusts the string to make it as quick to parse as possible. Any numerical values from the raw
+     * string that are specified by the user are placed in userDoubles and replaced with a $ character.
+     * The first ten unique complex numbers specified by the user are replaced by single-digit values which refer to
+     * their place in an array. If any complex numbers are equal they are replaced by the same number. Then, when
+     * parsing, the complex number only needs to be evaluated once and stored in another array. The string is also much
+     * shorter so the loop takes less time.
+     *
      * Throws the exception per error because a string that is invalid in one way can lead to valid parts of
      * the string being wrongly listed as invalid.
      */
-    public void validateInstructions() throws InvalidInstructionsException {
+    public void validateInstructions() throws InvalidInstructionsException
+    {
         String rawInstructions = this.rawInstructions;
 
         //Checks that there is only one semicolon
         String[] instructionParts = rawInstructions.split(";");
         int noOfParts = instructionParts.length;
-        if (noOfParts < 2) {
+        if (noOfParts < 2)
+        {
             throw new InvalidInstructionsException("There was no semicolon to separate the first term from the rule " +
                     "for the next term.");
-        } else if (noOfParts > 2) {
+        }
+        else if (noOfParts > 2)
+        {
             throw new InvalidInstructionsException("Only one semicolon is permitted.");
         }
 
@@ -451,96 +516,163 @@ public class FractalPanel extends JPanel
         //f or p (which can refer to the first term) because the first term is a base case so cannot be defined in terms
         //of itself. The first term therefore has to be checked for f or p and then normal validation rules will apply
         //to both.
-        //Also, if the first term contains any other special complex, it is flagged as needing to be recalculated for
-        //each point.
-        boolean canKeepConstant = true;
         String firstTerm = instructionParts[0];
         char currentChar;
-        for (int x = 0; x < firstTerm.length(); ++x) {
+        for (int x = 0; x < firstTerm.length(); ++x)
+        {
             currentChar = firstTerm.charAt(x);
-            if (currentChar == 'f') {
+            if (currentChar == 'f')
+            {
                 throw new InvalidInstructionsException("Cannot use the character f when defining the first term.");
-            } else if (currentChar == 'p') {
+            }
+            else if (currentChar == 'p')
+            {
                 throw new InvalidInstructionsException("Cannot use the character p when defining the first term.");
-            } else if (isSpecialComplex(currentChar)) {
-                canKeepConstant = false;
             }
         }
 
-        //Checks for user-defined doubles. If any are found, they are added to userDoubles and replaced with a $
-        //character for faster processing later on.
-        ArrayList<String> possibleDoubles = new ArrayList<String>();
-        int possDoubStartIndex = -1;
-        String newFirstTerm = "";
-        String newInstructions = "";
+        //Loops through the string to check for user-defined doubles. If any are found, they are added to userDoubles
+        //and replaced with a reference to an item of userDoubles, for faster processing later on.
+        int possValueStartIndex = -1;
+        String doublesRemovedInstructions = "";
+        String nextValueString = "";
         int x = 0;
-        while (x < rawInstructions.length()) {
+        while (x < rawInstructions.length())
+        {
             currentChar = rawInstructions.charAt(x);
             if (this.isSpecialComplex(currentChar) || this.isUnaryOperator(currentChar) ||
                     this.isBinaryOperator(currentChar) || currentChar == '[' || currentChar == ',' || currentChar == ']'
                     || currentChar == ';')
             {
-                //It can't possibly be part of a double
-                if (possDoubStartIndex > -1)
+                //currentChar can't possibly be part of a double
+                if (possValueStartIndex > -1)
                 {
-                    possibleDoubles.add(rawInstructions.substring(possDoubStartIndex, x));
-                    newInstructions += rawInstructions.substring(0, possDoubStartIndex) + "$";
+                    //The method has detected the start of a new double before
+                    try
+                    {
+                        //Replaces the user double with D followed by the index returned by addNewUserDouble,
+                        //effectively pointing to the double in userDoubles.
+                        doublesRemovedInstructions += rawInstructions.substring(0, possValueStartIndex) + "D"
+                                + this.addNewUserDouble(rawInstructions.substring(possValueStartIndex, x));
+                    }
+                    catch(NumberFormatException nfe)
+                    {
+                        //The double string wasn't a valid double
+                        throw new InvalidInstructionsException("'"+nextValueString+"' is not a valid number.");
+                    }
+                    catch(ArrayIndexOutOfBoundsException aioobe)
+                    {
+                        //The array was full so numberToTry went out of range
+                        throw new InvalidInstructionsException("Too many numbers have been defined.");
+                    }
+
+                    //Restarts the search for doubles using the rest of rawInstructions
                     rawInstructions = rawInstructions.substring(x);
                     x = 0;
-                    possDoubStartIndex = -1;
-                }
-                if(currentChar == ';')
-                {
-                    //At this point, the size of possibleDoubles is equal to the number of user doubles in the first
-                    //term.
-                    this.firstNextTermUserDoubleIndex = possibleDoubles.size();
-                    //Also, the first term is completely processed, although the last character still needs to be added.
-                    newFirstTerm = newInstructions + rawInstructions.substring(0, 1);
+                    possValueStartIndex = -1;
                 }
             }
             else
             {
-                if (possDoubStartIndex == -1) {
-                    possDoubStartIndex = x;
+                //This character could be the start of a double.
+                if (possValueStartIndex == -1) {
+                    possValueStartIndex = x;
                 }
             }
             ++x;
         }
-        if (possDoubStartIndex > -1) {
-            //There is one more double left over
-            possibleDoubles.add(rawInstructions.substring(possDoubStartIndex));
-            newInstructions += "$";
+        //The whole string has been looped through.
+        if (possValueStartIndex > -1)
+        {
+            //There is one more possible double left over
+            doublesRemovedInstructions += rawInstructions.substring(0, possValueStartIndex) + "D"
+                    + this.addNewUserDouble(rawInstructions.substring(possValueStartIndex));
         } else {
             //There are some operators and/or complexes left over
-            newInstructions += rawInstructions;
+            doublesRemovedInstructions += rawInstructions;
         }
-        int noOfPossDoubs = possibleDoubles.size();
-        double[] userDoubles = new double[noOfPossDoubs];
-        for (x = 0; x < noOfPossDoubs; ++x) {
-            String nextString = possibleDoubles.get(x);
-            try {
-                userDoubles[x] = Double.parseDouble(possibleDoubles.get(x));
-            } catch (NumberFormatException nfe) {
-                throw new InvalidInstructionsException("'" + nextString + "' is not a valid number.");
+
+        //Loops through the string again, to check for user-defined complex numbers. If any are found, they are added to
+        //one of two arrays and replaced with a reference to an item of userComplexStrings, for faster processing later
+        //on.
+        possValueStartIndex = -1;
+        String complexesRemovedInstructions = "";
+        nextValueString = "";
+        x = 0;
+        while (x < doublesRemovedInstructions.length())
+        {
+            currentChar = doublesRemovedInstructions.charAt(x);
+            if(currentChar == '[') {
+                //This character could be the start of a complex.
+                if (possValueStartIndex == -1) {
+                    possValueStartIndex = x;
+                } else {
+                    //The user is starting a new complex inside a new complex - not allowed
+                    throw new InvalidInstructionsException("Cannot create a new complex number inside one that is still being created.");
+                }
             }
+            else if(currentChar == ']')
+            {
+                //This character could be the end of a valid complex.
+                if(possValueStartIndex == -1)
+                {
+                    //Closing bracket before an opening bracket
+                    throw new InvalidInstructionsException("Cannot use ']' without a '[' before it.");
+                }
+                else
+                {
+                    nextValueString = doublesRemovedInstructions.substring(possValueStartIndex, x + 1);
+                    //Replaces the user complex with C followed by the index returned by addNewUserComplex,
+                    //effectively pointing to the complex in userComplexes.
+                    try
+                    {
+                        complexesRemovedInstructions += doublesRemovedInstructions.substring(0, possValueStartIndex) + "C"
+                                + this.addNewUserComplex(nextValueString);
+                    }
+                    catch(NumberFormatException nfe)
+                    {
+                        //The complex string wasn't valid
+                        throw new InvalidInstructionsException("'"+nextValueString+"' is not a valid complex number.");
+                    }
+                    catch(ArrayIndexOutOfBoundsException aioobe)
+                    {
+                        //The array was full so numberToTry went out of range
+                        throw new InvalidInstructionsException("Too many complex numbers have been defined.");
+                    }
+
+                    //Restarts the search for complexes using the rest of doublesRemovedInstructions
+                    doublesRemovedInstructions = doublesRemovedInstructions.substring(x + 1);
+                    x = 0;
+                    possValueStartIndex = -1;
+                }
+            }
+            ++x;
         }
-        this.userDoubles = userDoubles;
-        //Both terms must evaluate to complex numbers.
-        instructionParts = newInstructions.split(";");
+        //The whole string has been looped through.
+        if (possValueStartIndex > -1)
+        {
+            //There is one more possible Complex left over
+            complexesRemovedInstructions += doublesRemovedInstructions.substring(0, possValueStartIndex) + "C"
+                    + this.addNewUserComplex(doublesRemovedInstructions.substring(possValueStartIndex));
+        }
+        else
+        {
+            //There are some operators and/or complexes left over
+            complexesRemovedInstructions += doublesRemovedInstructions;
+        }
+
+        //Checks that both sections of the instruction string evaluate to complex numbers.
+        instructionParts = complexesRemovedInstructions.split(";");
         if (!isComplex(instructionParts[0])) {
             throw new InvalidInstructionsException("The result of the first term is not a complex number.");
         }
         if (!isComplex(instructionParts[1])) {
             throw new InvalidInstructionsException("The result of the rule for the next term is not a complex number.");
         }
-        //The string is definitely valid after this point.
-        this.userDoublesIndex = 0;
-        if (canKeepConstant)
-        {
-            //All complex parameters can be null because there are no special complexes in the first term.
-            this.constantFirstTerm = this.parseInstruction(newFirstTerm, null, null, null, null);
-        }
-        this.processedInstructions = newInstructions;
+
+        //At this point, the instruction string is considered valid.
+        this.processedFirstTerm = instructionParts[0];
+        this.processedNextTerm = instructionParts[1];
     }
 
     private boolean isBinaryOperator(char c)
@@ -567,10 +699,10 @@ public class FractalPanel extends JPanel
     {
         char firstChar = s.charAt(0);
         int stringLength = s.length();
-        if(stringLength == 1)
+        if(stringLength == 2)
         {
             //s is one of the user-defined doubles
-            return firstChar == '$';
+            return firstChar == 'D' || (this.isSpecialComplex(s.charAt(1)) && (firstChar == 'i' || firstChar == 'r'));
         }
         else
         {
@@ -629,12 +761,20 @@ public class FractalPanel extends JPanel
             //Only the special Complex numbers can take up a single character.
             return isSpecialComplex(s.charAt(0));
         }
+        else if(stringLength == 2)
+        {
+            return s.charAt(0) == 'C';
+        }
         //Two complexes of any length must have a binary operator between them, so if the string is length 2 then
         //that is invalid
         else if(stringLength > 2)
         {
             //Checks if the first complex is special
             if(isSpecialComplex(s.charAt(0)) && isBinaryOperator(s.charAt(1)) && isComplex(s.substring(2)))
+            {
+                return true;
+            }
+            else if(isComplex(s.substring(0, 2)) && isBinaryOperator(s.charAt(2)) && isComplex(s.substring(3)))
             {
                 return true;
             }
@@ -698,6 +838,100 @@ public class FractalPanel extends JPanel
         return false;
     }
 
+    /**
+     * Operates very similarly to addNewUserDouble. Strings which will not have a constant value are placed in
+     * userComplexStrings. Strings which will are converted straight to complex numbers and stored in userComplexes.
+     */
+    private int addNewUserComplex(String nextComplexString) throws ArrayIndexOutOfBoundsException, NumberFormatException
+    {
+        //If the complex takes the form [Dx,Dy], it is made up of user-defined numbers so it will not need
+        //to be recalculated. This checks for that pattern.
+        if(nextComplexString.matches("\\[\\D\\d,\\D\\d\\]"))
+        {
+            //This complex can go straight to userComplexes
+            Complex newComplex = this.parseComplex(nextComplexString, null, null, null, null);
+            int numberToTry = -1;
+            while(numberToTry > -2)
+            {
+                ++numberToTry;
+                if(this.userComplexes[numberToTry] == null && this.userComplexStrings[numberToTry] == null)
+                {
+                    this.userComplexes[numberToTry] = newComplex;
+                    return numberToTry;
+                }
+                else if(this.userComplexes[numberToTry] != null)
+                {
+                    if(this.userComplexes[numberToTry].getRealPart() == newComplex.getRealPart()
+                            &&this.userComplexes[numberToTry].getImagPart() == newComplex.getImagPart())
+                    {
+                        return numberToTry;
+                    }
+                }
+            }
+        }
+        else
+        {
+            //The complex needs to be validated. If it is found to be valid it goes to userComplexStrings because
+            //it doesn't just contain user doubles, so it may need to be recalculated every iteration.
+            if(this.isComplex(nextComplexString))
+            {
+                int numberToTry = -1;
+                while(numberToTry > -2)
+                {
+                    ++numberToTry;
+                    if(this.userComplexes[numberToTry] == null && this.userComplexStrings[numberToTry] == null)
+                    {
+                        this.userComplexStrings[numberToTry] = nextComplexString;
+                        return numberToTry;
+                    }
+                    else if(this.userComplexStrings[numberToTry] != null)
+                    {
+                        if(this.userComplexStrings[numberToTry].equals(nextComplexString))
+                        {
+                            return numberToTry;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                throw new NumberFormatException();
+            }
+        }
+        //Should have thrown an exception before this point
+        return 666;
+    }
+
+    /**
+     * If the candidate double is valid, this iterates through userDoubles to find a place for it.
+     * @return The index in the array of this double value.
+     */
+    private int addNewUserDouble(String nextDoubleString) throws ArrayIndexOutOfBoundsException, NumberFormatException
+    {
+        Double nextDouble = Double.parseDouble(nextDoubleString);
+        //At this point the double is valid.
+        int numberToTry = -1;
+        //If the item being checked is null, all previous doubles must have been checked and found to be
+        //equal.
+        //If the item being checked is equal to nextDouble, the loop simply stops.
+        //Once the loop stops, the double string is replaced with D followed by the index the loop
+        //stopped at, which effectively points to the double in the array.
+        while(numberToTry > -2)
+        {
+            ++numberToTry;
+            if(this.userDoubles[numberToTry] == null)
+            {
+                this.userDoubles[numberToTry] = nextDouble;
+                return numberToTry;
+            }
+            else if(this.userDoubles[numberToTry].equals(nextDouble))
+            {
+                return numberToTry;
+            }
+        }
+        //Should have thrown an exception before reaching this point
+        return 666;
+    }
     //BASIC GETTERS AND SETTERS
 
     public void setRawInstructions(String instructions)
@@ -705,13 +939,10 @@ public class FractalPanel extends JPanel
         this.rawInstructions = instructions;
     }
 
-    public String getRawInstructions()
+    public String getProcessedFirstTerm()
     {
-        return this.rawInstructions;
+        return this.processedFirstTerm;
     }
 
-    public String getProcessedInstructions()
-    {
-        return this.processedInstructions;
-    }
+    public String getProcessedNextTerm() { return this.processedNextTerm; }
 }

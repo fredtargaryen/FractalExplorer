@@ -46,12 +46,14 @@ public class FractalSelectPanel extends JPanel
                         "Please enter a formula for the fractal.\n" +
                                 "Formula rules:\n" +
                                 "*The formula must contain a rule for obtaining the initial term, and a rule for" +
-                                " obtaining the next term, separated by a semicolon.\n" +
+                                " obtaining the next\n term, separated by a semicolon.\n" +
                                 "*No spaces are allowed between characters.\n" +
                                 "*Exponents are not valid (yet).\n" +
                                 "*Simply negating values with - is not valid (yet).\n" +
                                 "*To define complex numbers, use the format [x,y], where x is the complex number's real" +
-                                " part and y is its imaginary part.\n" +
+                                " part\n and y is its imaginary part.\n" +
+                                "*Defining a complex number while defining a different complex number is not permitted.\n" +
+                                "*Up to 10 unique normal numbers and up to 10 unique complex numbers can be defined.\n" +
                                 "*Special complex numbers:\n" +
                                 " ~f refers to the first term in the iteration sequence (cannot use in the first term" +
                                 " rule).\n" +
@@ -67,7 +69,8 @@ public class FractalSelectPanel extends JPanel
                                 "*Binary operators: use * to multiply, + to add and - to subtract two values.\n" +
                                 " The two values operated on must be either both complex numbers or both decimal" +
                                 " numbers.\n" +
-                                "*Ordering: Brackets are not valid (yet) so values are evaluated from left to right.", "Create New Fractal", JOptionPane.PLAIN_MESSAGE);
+                                "*Ordering: Brackets are not valid (yet) so values are evaluated from left to right, i.e.\n" +
+                                " 2+3*2 = 10", "Create New Fractal", JOptionPane.PLAIN_MESSAGE);
                 if(rawInstructions != null)
                 {
                     InteractiveFractalPanel ifp = new InteractiveFractalPanel();
@@ -118,8 +121,8 @@ public class FractalSelectPanel extends JPanel
             }
         });
 
-        this.add(this.chooseFractal, 0, 0);
-        this.add(this.createFractal, 1, 0);
-        this.add(this.deleteFractal, 2, 0);
+        this.add(this.deleteFractal, 0, 0);
+        this.add(this.chooseFractal, 1, 0);
+        this.add(this.createFractal, 2, 0);
     }
 }

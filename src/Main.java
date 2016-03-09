@@ -21,11 +21,10 @@ import gui.FractalDisplay;
  */
 
 /**
- * TODO Same complex detector
- * TODO - as unary operator as well
- * TODO Stop Julia zooming in
- * TODO Fractal generation kind of slow
+ * TODO Julia zooming in
+ * TODO Slow fractal generation
  * TODO Broke selection rectangle again (1 and 3)
+ * TODO - as unary operator as well
  *
  * TODO Orbit Traps
  */

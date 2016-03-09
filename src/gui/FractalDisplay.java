@@ -62,6 +62,7 @@ public class FractalDisplay extends JFrame
         this.favourites = new HashMap<String, Complex>();
         this.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         this.fractals = new HashMap<String, InteractiveFractalPanel>();
+
         //No real exception handling because these strings are known to be valid
         InteractiveFractalPanel mandel = new InteractiveFractalPanel();
         mandel.setRawInstructions("c;p*p+c");
@@ -81,7 +82,7 @@ public class FractalDisplay extends JFrame
         //Construct member components
         this.bottomDisplay = new DisplayParameterPanel();
         this.juliaImage = new JuliaPanel();
-        this.setLeftPanel(mandel);
+        this.setLeftPanel(ship);
         this.topDisplay = new PointSelectionPanel();
         this.fractSelect = new FractalSelectPanel();
 
@@ -108,6 +109,7 @@ public class FractalDisplay extends JFrame
         contentPane.add(this.leftImage, BorderLayout.CENTER);
         this.juliaImage.linkPanel(this.leftImage);
         contentPane.revalidate();
+        contentPane.repaint();
     }
 
     //BASIC GETTERS AND SETTERS BELOW HERE
