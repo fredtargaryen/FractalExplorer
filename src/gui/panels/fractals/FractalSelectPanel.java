@@ -2,6 +2,7 @@ package gui.panels.fractals;
 
 import exceptions.InvalidInstructionsException;
 import gui.FractalDisplay;
+import javafx.scene.layout.VBox;
 
 import javax.swing.*;
 import java.awt.*;
@@ -11,33 +12,17 @@ import java.util.HashMap;
 
 public class FractalSelectPanel extends JPanel
 {
-    private JButton chooseFractal;
     private JButton createFractal;
+    private JButton chooseFractal;
+    private JButton chooseOrbit;
     private JButton deleteFractal;
 
     public FractalSelectPanel()
     {
         super();
-        this.setLayout(new GridLayout(3, 1));
-        this.chooseFractal = new JButton("Select Fractal...");
-        this.chooseFractal.addActionListener(new ActionListener()
-        {
-            @Override
-            public void actionPerformed(ActionEvent e)
-            {
-                FractalDisplay mainWindow = FractalDisplay.getMainWindow();
-                HashMap<String, InteractiveFractalPanel> fractalMap = mainWindow.getFractals();
-                String chosenName = (String) JOptionPane.showInputDialog(FractalSelectPanel.this.chooseFractal,
-                        "Please select a fractal to display.", "Select Fractal", JOptionPane.QUESTION_MESSAGE, null,
-                        fractalMap.keySet().toArray(), "Click to select");
-                if(chosenName != null && fractalMap.containsKey(chosenName))
-                {
-                    mainWindow.setLeftPanel(fractalMap.get(chosenName));
-                }
-            }
-        });
+        this.setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 
-        this.createFractal = new JButton("Create new fractal...");
+        this.createFractal = new JButton("Create New Fractal...");
         this.createFractal.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e)
@@ -106,6 +91,41 @@ public class FractalSelectPanel extends JPanel
             }
         });
 
+        this.chooseFractal = new JButton("Select Fractal...");
+        this.chooseFractal.addActionListener(new ActionListener()
+        {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                FractalDisplay mainWindow = FractalDisplay.getMainWindow();
+                HashMap<String, InteractiveFractalPanel> fractalMap = mainWindow.getFractals();
+                String chosenName = (String) JOptionPane.showInputDialog(FractalSelectPanel.this.chooseFractal,
+                        "Please select a fractal to display.", "Select Fractal", JOptionPane.QUESTION_MESSAGE, null,
+                        fractalMap.keySet().toArray(), "Click to select");
+                if(chosenName != null && fractalMap.containsKey(chosenName))
+                {
+                    mainWindow.setLeftPanel(fractalMap.get(chosenName));
+                }
+            }
+        });
+
+        this.chooseOrbit = new JButton("Select Orbit Trap...");
+        this.chooseOrbit.addActionListener(new ActionListener()
+        {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                FractalDisplay mainWindow = FractalDisplay.getMainWindow();
+                String chosenOrbitName = (String) JOptionPane.showInputDialog(FractalSelectPanel.this.chooseOrbit,
+                        "Please choose the orbit trap to use.\nSelect 'None' to not use an orbit trap.", "Select Orbit Trap", JOptionPane.QUESTION_MESSAGE, null,
+                        new String[]{"None", "Circle", "Cross (English)", "Cross (Scottish)"}, "Click to select");
+                if(chosenOrbitName != null)
+                {
+                    mainWindow.setOrbitTrap(chosenOrbitName);
+                }
+            }
+        });
+
         this.deleteFractal = new JButton("Delete a fractal...");
         this.deleteFractal.addActionListener(new ActionListener() {
             @Override
@@ -121,8 +141,9 @@ public class FractalSelectPanel extends JPanel
             }
         });
 
-        this.add(this.deleteFractal, 0, 0);
-        this.add(this.chooseFractal, 1, 0);
-        this.add(this.createFractal, 2, 0);
+        this.add(this.createFractal);
+        this.add(this.chooseFractal);
+        this.add(this.chooseOrbit);
+        this.add(this.deleteFractal);
     }
 }

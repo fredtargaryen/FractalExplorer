@@ -82,7 +82,7 @@ public class FractalDisplay extends JFrame
         //Construct member components
         this.bottomDisplay = new DisplayParameterPanel();
         this.juliaImage = new JuliaPanel();
-        this.setLeftPanel(ship);
+        this.setLeftPanel(mandel);
         this.topDisplay = new PointSelectionPanel();
         this.fractSelect = new FractalSelectPanel();
 
@@ -110,6 +110,13 @@ public class FractalDisplay extends JFrame
         this.juliaImage.linkPanel(this.leftImage);
         contentPane.revalidate();
         contentPane.repaint();
+    }
+
+    public void setOrbitTrap(String trapName)
+    {
+        this.leftImage.setOrbitTrap(trapName);
+        this.juliaImage.setOrbitTrap(trapName);
+        this.repaint();
     }
 
     //BASIC GETTERS AND SETTERS BELOW HERE

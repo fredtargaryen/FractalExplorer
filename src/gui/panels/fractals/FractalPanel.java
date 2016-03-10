@@ -34,23 +34,23 @@ public class FractalPanel extends JPanel
     /**
      * The instruction string as entered by the user.
      */
-    private String rawInstructions;
+    protected String rawInstructions;
 
     /**
      * The definition of the iteration sequence's first term, validated and edited by the program for faster processing.
      */
-    private String processedFirstTerm;
+    protected String processedFirstTerm;
 
     /**
      * The definition of the iteration sequence's next term, validated and edited by the program for faster processing.
      */
-    private String processedNextTerm;
+    protected String processedNextTerm;
 
     /**
      * Stores up to 10 unique strings representing user-defined numerical values.
      * In processed instruction strings, "Dx" refers to number x in this array.
      */
-    private Double[] userDoubles;
+    protected Double[] userDoubles;
 
     /**
      * Stores up to 10 unique strings representing user-defined complexes.
@@ -59,7 +59,7 @@ public class FractalPanel extends JPanel
      * parseComplex(userComplexStrings[x], ...) must be called.
      * If there is no value, the complex value is constant, so it can be acquired directly from userComplexes[x].
      */
-    private String[] userComplexStrings;
+    protected String[] userComplexStrings;
 
     /**
      * Stores up to 10 unique user-defined complex numbers, that do not need to be recalculated.
@@ -71,9 +71,25 @@ public class FractalPanel extends JPanel
      * will have to be removed; the values that need removing can be identified because their corresponding strings are
      * not null.
      */
-    private Complex[] userComplexes;
+    protected Complex[] userComplexes;
 
+    /**
+     * 10 because the numbers 0-9 can be easily used to reference a user value with just one character.
+     */
     private static final int NO_OF_ALLOWED_USER_VALUES = 10;
+
+    /**
+     * The possible orbit traps.
+     */
+    public enum Orbit
+    {
+        NONE,
+        CIRCLE,
+        CROSS_ENGLISH,
+        CROSS_SCOTTISH
+    }
+
+    private Orbit orbit;
 
     public FractalPanel()
     {
@@ -86,6 +102,7 @@ public class FractalPanel extends JPanel
         this.userDoubles = new Double[NO_OF_ALLOWED_USER_VALUES];
         this.userComplexStrings = new String[NO_OF_ALLOWED_USER_VALUES];
         this.userComplexes = new Complex[NO_OF_ALLOWED_USER_VALUES];
+        this.orbit = Orbit.NONE;
     }
 
     /**
@@ -131,54 +148,49 @@ public class FractalPanel extends JPanel
      */
     public void paintRect(Graphics g, int rectx, int recty, int width, int height)
     {
-        String firstTermString = this.getProcessedFirstTerm();
-        String nextTermString = this.getProcessedNextTerm();
-        if(!(firstTermString.equals("") || nextTermString.equals("")))
+        String firstTermString = this.processedFirstTerm;
+        String nextTermString = this.processedNextTerm;
+        this.iterations = FractalDisplay.getMainWindow().getParamPanel().getIterations();
+        Complex userSelectedPoint = FractalDisplay.getMainWindow().getTopDisplay().getLastPoint();
+
+        //The Complex whose corresponding pixel is currently being coloured in the FractalPanel
+        Complex currentPoint;
+
+        //The first term in the iteration sequence for this fractal
+        Complex firstTerm;
+
+        //The previous term in the iteration sequence for this fractal
+        Complex prevSeqValue;
+
+        int iterationsManaged;
+
+        //Stops the while loop if the escape condition is satisfied.
+        boolean stop;
+        for (int y = recty; y < height; ++y)
         {
-            this.iterations = FractalDisplay.getMainWindow().getParamPanel().getIterations();
-            Complex userSelectedPoint = FractalDisplay.getMainWindow().getTopDisplay().getLastPoint();
-
-            //The Complex whose corresponding pixel is currently being coloured in the FractalPanel
-            Complex currentPoint;
-
-            //The first term in the iteration sequence for this fractal
-            Complex firstTerm;
-
-            //The previous term in the iteration sequence for this fractal
-            Complex prevSeqValue;
-
-            int iterationsManaged;
-
-            //Stops the while loop if the squared modulus gets above 4
-            boolean stop;
-            for (int y = recty; y < height; ++y)
+            for (int x = rectx; x < width; ++x)
             {
-                for (int x = rectx; x < width; ++x)
-                {
-                    currentPoint = this.getPanelCoordsAsComplex(rectx + x, recty + y);
+                currentPoint = this.getPanelCoordsAsComplex(rectx + x, recty + y);
 
-                    firstTerm = this.parseComplex(firstTermString, null, null, currentPoint, userSelectedPoint);
-                    stop = false;
-                    iterationsManaged = 0;
-                    prevSeqValue = firstTerm.clone();
-                    if (prevSeqValue.modulusSquared() < 4)
+                firstTerm = this.parseComplex(firstTermString, null, null, currentPoint, userSelectedPoint);
+                stop = false;
+                iterationsManaged = 0;
+                prevSeqValue = firstTerm.clone();
+                if (!this.escape(prevSeqValue))
+                {
+                    while (iterationsManaged < this.iterations + 1 && !stop)
                     {
-                        while (iterationsManaged < this.iterations + 1 && !stop)
+                        ++iterationsManaged;
+                        //Uses next term rule to determine how to reach the next term
+                        prevSeqValue = this.parseComplex(nextTermString, prevSeqValue, firstTerm, currentPoint, userSelectedPoint);
+                        if (this.escape(prevSeqValue))
                         {
-                            ++iterationsManaged;
-                            //Uses next term rule to determine how to reach the next term
-                            prevSeqValue = this.parseComplex(nextTermString, prevSeqValue, firstTerm, currentPoint, userSelectedPoint);
-                            if (prevSeqValue.modulusSquared() >= 4)
-                            {
-                                stop = true;
-                            }
+                            stop = true;
                         }
                     }
-                    g.setColor(this.chooseColour(iterationsManaged));
-                    int paintx = rectx + x;
-                    int painty = recty + y;
-                    g.drawLine(paintx, painty, paintx, painty);
                 }
+                g.setColor(this.chooseColour(prevSeqValue, iterationsManaged));
+                g.drawRect(rectx + x, recty + y, 1, 1);
             }
         }
     }
@@ -187,36 +199,103 @@ public class FractalPanel extends JPanel
     public void paintComponent(Graphics g)
     {
         super.paintComponent(g);
-        FractalDisplay mainWindow = FractalDisplay.getMainWindow();
-        mainWindow.setTitle("Fractal Explorer (Drawing - please wait)");
-        this.paintRect(g, 0, 0, this.getWidth(), this.getHeight());
-        mainWindow.setTitle("Fractal Explorer");
+        if(!(this.processedFirstTerm.equals("") || this.processedNextTerm.equals("")))
+        {
+            FractalDisplay mainWindow = FractalDisplay.getMainWindow();
+            mainWindow.setTitle("Fractal Explorer (Drawing - please wait)");
+            this.paintRect(g, 0, 0, this.getWidth(), this.getHeight());
+            mainWindow.setTitle("Fractal Explorer");
+        }
     }
 
     /**
-     * Decides the colour based on the number of iterations performed before divergence
+     * Determines whether the point should stop the sequence
      */
-    private Color chooseColour(int iterationsManaged)
+    private boolean escape(Complex point)
     {
-        if(iterationsManaged > iterations)
+        switch(this.orbit)
         {
-            return Color.BLACK;
+            case CIRCLE:
+                //Creates a circle of radius 0.25.
+                return point.modulusSquared() <= 0.25;
+            case CROSS_ENGLISH:
+                //Creates a cross along the axes of thickness 0.1.
+                return Math.abs(point.getRealPart()) <= 0.05
+                        || Math.abs(point.getImagPart()) <= 0.05;
+            case CROSS_SCOTTISH:
+                //Creates a diagonal cross of thickness 0.1.
+                double realPart = Math.abs(point.getRealPart());
+                double imagPart = Math.abs(point.getImagPart());
+                return realPart >= imagPart - 0.05 && realPart <= imagPart + 0.05;
+            default:
+                //The default: sequence terminates when modulus >= 2 (squared modulus >= 4).
+                return point.modulusSquared() >= 4.0;
         }
-        else if(iterationsManaged == 0)
+    }
+
+    /**
+     * Decides the colour based on the point position and number of iterations managed.
+     */
+    private Color chooseColour(Complex point, int iterationsManaged)
+    {
+        switch(this.orbit)
         {
-            return Color.WHITE;
-        }
-        else if(iterationsManaged < (float)iterations / 3)
-        {
-            return Color.LIGHT_GRAY;
-        }
-        else if(iterationsManaged < (float)iterations * 2 / 3)
-        {
-            return Color.GRAY;
-        }
-        else
-        {
-            return Color.DARK_GRAY;
+            case CIRCLE:
+                double distance = Math.sqrt(point.modulusSquared());
+                if(distance <= 0.5)
+                {
+                    float colourDist = 0.5F - (float) distance;
+                    return new Color(2 * colourDist, 0, colourDist);
+                }
+                else
+                {
+                    return Color.black;
+                }
+            case CROSS_ENGLISH:
+                double closestDistanceToAxis = Math.min(Math.abs(point.getRealPart()), Math.abs(point.getImagPart()));
+                if(closestDistanceToAxis <= 0.05)
+                {
+                    float colourDist = 0.05F - (float) closestDistanceToAxis;
+                    return new Color(20 * colourDist, 0, 0);
+                }
+                else
+                {
+                    return Color.white;
+                }
+            case CROSS_SCOTTISH:
+                float realVsImagDifference = (float)Math.abs(Math.abs(point.getRealPart()) - Math.abs(point.getImagPart()));
+                if(realVsImagDifference <= 0.05)
+                {
+                    realVsImagDifference *= 20;
+                    return new Color(1.0F - realVsImagDifference, 1.0F - realVsImagDifference, 1.0F);
+                }
+                else
+                {
+                    return Color.BLUE;
+                }
+            case NONE:
+                if (iterationsManaged > iterations)
+                {
+                    return Color.BLACK;
+                }
+                else if (iterationsManaged == 0)
+                {
+                    return Color.WHITE;
+                }
+                else if (iterationsManaged < (float) iterations / 3)
+                {
+                    return Color.LIGHT_GRAY;
+                }
+                else if (iterationsManaged < (float) iterations * 2 / 3)
+                {
+                    return Color.GRAY;
+                }
+                else
+                {
+                    return Color.DARK_GRAY;
+                }
+            default:
+                return Color.BLACK;
         }
     }
 
@@ -932,17 +1011,31 @@ public class FractalPanel extends JPanel
         //Should have thrown an exception before reaching this point
         return 666;
     }
+
+    public void setOrbitTrap(String name)
+    {
+        if(name.equals("None"))
+        {
+            this.orbit = Orbit.NONE;
+        }
+        else if(name.equals("Circle"))
+        {
+            this.orbit = Orbit.CIRCLE;
+        }
+        else if(name.equals("Cross (English)"))
+        {
+            this.orbit = Orbit.CROSS_ENGLISH;
+        }
+        else if(name.equals("Cross (Scottish)"))
+        {
+            this.orbit = Orbit.CROSS_SCOTTISH;
+        }
+    }
+
     //BASIC GETTERS AND SETTERS
 
     public void setRawInstructions(String instructions)
     {
         this.rawInstructions = instructions;
     }
-
-    public String getProcessedFirstTerm()
-    {
-        return this.processedFirstTerm;
-    }
-
-    public String getProcessedNextTerm() { return this.processedNextTerm; }
 }

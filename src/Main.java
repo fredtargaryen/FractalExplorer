@@ -12,21 +12,21 @@ import gui.FractalDisplay;
  * -Options for inverting the real and imaginary axes
  * -The option to select other fractals for display and interaction (Burning Ship and Buffalo)
  * -A parser for formulae entered by the user
+ * -Three different shapes of orbit trap
  *
  * --Operational Notes--
  * Thanks to the parser, the iteration procedure has slowed right down. I've tried to optimise it but it still takes a
  * worrying amount of time (especially on larger fractals like the Buffalo).
- * The window title changes to include "Drawing - please wait" while drawing - please keep waiting; it will get there
- * eventually!
+ * The window title changes to include "Drawing - please wait" while drawing - please keep waiting; it should get there
+ * eventually! It can render Z(i+1) = Z(i)^100+c, at 50 iterations with no traps, in just under 3 minutes.
  */
 
 /**
- * TODO Julia zooming in
- * TODO Slow fractal generation
- * TODO Broke selection rectangle again (1 and 3)
- * TODO - as unary operator as well
+ * TODO Not painting over old selection rectangle before painting new one.
+ * TODO Double painting at beginning?
  *
- * TODO Orbit Traps
+ * TODO Slow fractal generation
+ * TODO - as unary operator as well
  */
 public class Main
 {

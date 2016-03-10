@@ -28,8 +28,7 @@ public class InteractiveFractalPanel extends FractalPanel
         this.starty = -1;
         this.endx = -1;
         this.endy = -1;
-        this.endx_old = -1;
-        this.endy_old = -1;
+
         this.addMouseListener(new MouseAdapter()
         {
             /**
@@ -63,15 +62,14 @@ public class InteractiveFractalPanel extends FractalPanel
         });
     }
 
-    private void setDragRectCoords(int mousex, int mousey) {
+    private void setDragRectCoords(int mousex, int mousey)
+    {
         int width = this.getWidth();
         int height = this.getHeight();
 
         if (this.startx == -1 && this.starty == -1) {
             this.startx = mousex;
             this.starty = mousey;
-            this.endx_old = this.startx;
-            this.endy_old = this.starty;
         }
         else
         {
@@ -80,22 +78,24 @@ public class InteractiveFractalPanel extends FractalPanel
             } else if (mousex >= width) {
                 mousex = width - 1;
             }
-            if (mousey < 0) {
+            if (mousey < 0)
+            {
                 mousey = 0;
             } else if (mousey >= height) {
                 mousey = height - 1;
             }
-            this.endx_old = this.endx;
-            this.endy_old = this.endy;
             this.endx = mousex;
             this.endy = mousey;
+            if(this.endx > -1 && this.endy > -1)
+            {
+                this.repaint();
+            }
         }
-        this.repaint();
     }
 
     private void zoomInWithDragRectCoords()
     {
-        if(!(this.startx == this.endx || this.starty == this.endy))
+        if(this.startx != this.endx && this.starty != this.endy)
         {
             int leftx;
             int rightx;
@@ -132,65 +132,71 @@ public class InteractiveFractalPanel extends FractalPanel
         this.starty = -1;
         this.endx = -1;
         this.endy = -1;
-        this.endx_old = -1;
-        this.endy_old = -1;
     }
 
     @Override
-    public void paintComponent(Graphics g) {
-        if (this.startx > -1 && this.starty > -1 && this.endx > -1
-                && this.endy > -1 && this.endx_old > -1 && this.endy_old > -1)
+    public void paintComponent(Graphics g)
+    {
+        if(this.startx > -1 && this.endx_old > -1 && this.starty > -1 && this.endy_old > -1)
         {
             int leftx;
             int rightx;
             int topy;
             int bottomy;
-            int leftx_old;
-            int rightx_old;
-            int topy_old;
-            int bottomy_old;
-            if (this.startx <= this.endx) {
+
+            if (this.startx <= this.endx_old)
+            {
+                leftx = this.startx;
+                rightx = this.endx_old;
+            }
+            else
+            {
+                leftx = this.endx_old;
+                rightx = this.startx;
+            }
+            if (this.starty <= this.endy_old)
+            {
+                topy = this.starty;
+                bottomy = this.endy_old;
+            }
+            else
+            {
+                topy = this.endy_old;
+                bottomy = this.starty;
+            }
+
+            System.out.println("Painting over ("+leftx+", "+topy+", "+(rightx - leftx + 1)+", "+(bottomy - topy + 1)+")");
+            this.paintRect(g, leftx, topy, rightx - leftx + 1, bottomy - topy + 1);
+
+            if (this.startx <= this.endx)
+            {
                 leftx = this.startx;
                 rightx = this.endx;
-            } else {
+            }
+            else
+            {
                 leftx = this.endx;
                 rightx = this.startx;
             }
-            if (this.starty <= this.endy) {
+            if (this.starty <= this.endy)
+            {
                 topy = this.starty;
                 bottomy = this.endy;
-            } else {
+            }
+            else
+            {
                 topy = this.endy;
                 bottomy = this.starty;
             }
-            if (this.startx <= this.endx_old) {
-                leftx_old = this.startx;
-                rightx_old = this.endx_old;
-            } else {
-                leftx_old = this.endx_old;
-                rightx_old = this.startx;
-            }
-            if (this.starty <= this.endy_old) {
-                topy_old = this.starty;
-                bottomy_old = this.endy_old;
-            } else {
-                topy_old = this.endy_old;
-                bottomy_old = this.starty;
-            }
-            int width_old = rightx_old - leftx_old + 1;
-            int height_old = bottomy_old - topy_old + 1;
-            //Paint over the old rectangle. Makes sure to only paint over the edges
-            //to minimize recalculations.
-            this.paintRect(g, leftx_old,    topy_old,       width_old,  1);
-            this.paintRect(g, rightx_old,   topy_old,       1,          height_old);
-            this.paintRect(g, leftx_old,    bottomy_old,    width_old,  1);
-            this.paintRect(g, leftx_old,    topy_old,       1,          height_old);
             //Draw the new rectangle
             g.setColor(Color.CYAN);
+            System.out.println("Drawing ("+leftx+", "+topy+", "+(rightx - leftx + 1)+", "+(bottomy - topy + 1)+")");
             g.drawRect(leftx, topy, rightx - leftx + 1, bottomy - topy + 1);
+
+            this.endy_old = this.endy;
+            this.endx_old = this.endx;
         }
-        else if (this.startx == -1 && this.endx == -1 && this.starty == -1
-                && this.endy == -1 && this.endx_old == -1 && this.endy_old == -1)
+        else if (this.startx == -1 && this.endx == -1 && this.starty == -1 && this.endy == -1)
         {
             super.paintComponent(g);
         }

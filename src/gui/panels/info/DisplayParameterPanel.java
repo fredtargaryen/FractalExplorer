@@ -28,11 +28,11 @@ public class DisplayParameterPanel extends JPanel
     {
         super();
         //Construct all member variable components, with default values
-        this.leftRealBox = new JTextField("-2.5");
-        this.rightRealBox = new JTextField("1.5");
+        this.leftRealBox = new JTextField("-2.0");
+        this.rightRealBox = new JTextField("2.0");
         this.downImagBox = new JTextField("-1.6");
         this.upImagBox = new JTextField("1.6");
-        this.iterBox = new JTextField("100");
+        this.iterBox = new JTextField("50");
         this.okButton = new JButton("OK");
         this.okButton.addActionListener(new ActionListener()
         {
@@ -82,7 +82,7 @@ public class DisplayParameterPanel extends JPanel
             public void actionPerformed(ActionEvent e)
             {
                 //Changes the min and max values back to the default, as there currently is no zoom-out feature
-                DisplayParameterPanel.this.setMinMax(-2.5, 1.5, -1.6, 1.6);
+                DisplayParameterPanel.this.setMinMax(-2.0, 2.0, -1.6, 1.6);
                 DisplayParameterPanel.this.okButton.doClick();
             }
         });
