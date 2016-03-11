@@ -82,7 +82,7 @@ public class FractalDisplay extends JFrame
         //Construct member components
         this.bottomDisplay = new DisplayParameterPanel();
         this.juliaImage = new JuliaPanel();
-        this.setLeftPanel(mandel);
+        this.leftImage = mandel;
         this.topDisplay = new PointSelectionPanel();
         this.fractSelect = new FractalSelectPanel();
 
@@ -99,7 +99,7 @@ public class FractalDisplay extends JFrame
         this.setVisible(true);
     }
 
-    public void setLeftPanel(InteractiveFractalPanel panel) {
+    public void resetLeftPanel(InteractiveFractalPanel panel) {
         Container contentPane = this.getContentPane();
         if(this.leftImage != null)
         {

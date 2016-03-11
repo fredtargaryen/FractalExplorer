@@ -22,7 +22,6 @@ import gui.FractalDisplay;
  */
 
 /**
- * TODO Not painting over old selection rectangle before painting new one.
  * TODO Double painting at beginning?
  *
  * TODO Slow fractal generation

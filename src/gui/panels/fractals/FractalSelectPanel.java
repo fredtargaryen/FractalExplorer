@@ -2,10 +2,8 @@ package gui.panels.fractals;
 
 import exceptions.InvalidInstructionsException;
 import gui.FractalDisplay;
-import javafx.scene.layout.VBox;
 
 import javax.swing.*;
-import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.HashMap;
@@ -55,7 +53,8 @@ public class FractalSelectPanel extends JPanel
                                 " The two values operated on must be either both complex numbers or both decimal" +
                                 " numbers.\n" +
                                 "*Ordering: Brackets are not valid (yet) so values are evaluated from left to right, i.e.\n" +
-                                " 2+3*2 = 10", "Create New Fractal", JOptionPane.PLAIN_MESSAGE);
+                                " 2+3*2 = 10\n" +
+                                "*Example: The formula for the Burning Ship fractal is 'c;[arp,aip]*[arp,aip]+c", "Create New Fractal", JOptionPane.PLAIN_MESSAGE);
                 if(rawInstructions != null)
                 {
                     InteractiveFractalPanel ifp = new InteractiveFractalPanel();
@@ -104,7 +103,7 @@ public class FractalSelectPanel extends JPanel
                         fractalMap.keySet().toArray(), "Click to select");
                 if(chosenName != null && fractalMap.containsKey(chosenName))
                 {
-                    mainWindow.setLeftPanel(fractalMap.get(chosenName));
+                    mainWindow.resetLeftPanel(fractalMap.get(chosenName));
                 }
             }
         });

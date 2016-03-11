@@ -99,6 +99,8 @@ public class FractalPanel extends JPanel
         this.doubleStack = new Stack<Double>();
         this.operatorStack = new Stack<Character>();
         this.rawInstructions = "";
+        this.processedFirstTerm = "";
+        this.processedNextTerm = "";
         this.userDoubles = new Double[NO_OF_ALLOWED_USER_VALUES];
         this.userComplexStrings = new String[NO_OF_ALLOWED_USER_VALUES];
         this.userComplexes = new Complex[NO_OF_ALLOWED_USER_VALUES];
@@ -148,49 +150,38 @@ public class FractalPanel extends JPanel
      */
     public void paintRect(Graphics g, int rectx, int recty, int width, int height)
     {
-        String firstTermString = this.processedFirstTerm;
-        String nextTermString = this.processedNextTerm;
-        this.iterations = FractalDisplay.getMainWindow().getParamPanel().getIterations();
         Complex userSelectedPoint = FractalDisplay.getMainWindow().getTopDisplay().getLastPoint();
-
-        //The Complex whose corresponding pixel is currently being coloured in the FractalPanel
-        Complex currentPoint;
-
-        //The first term in the iteration sequence for this fractal
-        Complex firstTerm;
-
-        //The previous term in the iteration sequence for this fractal
-        Complex prevSeqValue;
-
-        int iterationsManaged;
-
-        //Stops the while loop if the escape condition is satisfied.
-        boolean stop;
-        for (int y = recty; y < height; ++y)
+        if(userSelectedPoint != null || (!this.processedFirstTerm.contains("u") && !this.processedNextTerm.contains("u")))
         {
-            for (int x = rectx; x < width; ++x)
-            {
-                currentPoint = this.getPanelCoordsAsComplex(rectx + x, recty + y);
+            this.iterations = FractalDisplay.getMainWindow().getParamPanel().getIterations();
 
-                firstTerm = this.parseComplex(firstTermString, null, null, currentPoint, userSelectedPoint);
-                stop = false;
-                iterationsManaged = 0;
-                prevSeqValue = firstTerm.clone();
-                if (!this.escape(prevSeqValue))
-                {
-                    while (iterationsManaged < this.iterations + 1 && !stop)
-                    {
+            //The Complex whose corresponding pixel is currently being coloured in the FractalPanel
+            Complex currentPoint;
+
+            //The first term in the iteration sequence for this fractal
+            Complex firstTerm;
+
+            //The previous term in the iteration sequence for this fractal
+            Complex prevSeqValue;
+
+            int iterationsManaged;
+
+            //Stops the while loop if the escape condition is satisfied.
+            for (int y = recty; y < recty + height; ++y) {
+                for (int x = rectx; x < rectx + width; ++x) {
+                    currentPoint = this.getPanelCoordsAsComplex(x, y);
+
+                    firstTerm = this.parseComplex(this.processedFirstTerm, null, null, currentPoint, userSelectedPoint);
+                    iterationsManaged = 0;
+                    prevSeqValue = firstTerm.clone();
+                    while (!this.escape(prevSeqValue) && iterationsManaged < this.iterations + 1) {
                         ++iterationsManaged;
                         //Uses next term rule to determine how to reach the next term
-                        prevSeqValue = this.parseComplex(nextTermString, prevSeqValue, firstTerm, currentPoint, userSelectedPoint);
-                        if (this.escape(prevSeqValue))
-                        {
-                            stop = true;
-                        }
+                        prevSeqValue = this.parseComplex(this.processedNextTerm, prevSeqValue, firstTerm, currentPoint, userSelectedPoint);
                     }
+                    g.setColor(this.chooseColour(prevSeqValue, iterationsManaged));
+                    g.drawLine(x, y, x, y);
                 }
-                g.setColor(this.chooseColour(prevSeqValue, iterationsManaged));
-                g.drawRect(rectx + x, recty + y, 1, 1);
             }
         }
     }
@@ -217,7 +208,7 @@ public class FractalPanel extends JPanel
         {
             case CIRCLE:
                 //Creates a circle of radius 0.25.
-                return point.modulusSquared() <= 0.25;
+                return Math.sqrt(point.modulusSquared()) <= 0.25;
             case CROSS_ENGLISH:
                 //Creates a cross along the axes of thickness 0.1.
                 return Math.abs(point.getRealPart()) <= 0.05
@@ -413,8 +404,9 @@ public class FractalPanel extends JPanel
                 enterStackLoop = false;
             }
 
-            //THE STACK LOOP
-            if(enterStackLoop) {
+            //The stack loop pops and processes as many operators as it can before exitStackLoop gets set to true.
+            if(enterStackLoop)
+            {
                 char topOperator;
                 //Used for characters that are waiting for more operands and so are not ready to take from the stack.
                 boolean exitStackLoop = false;

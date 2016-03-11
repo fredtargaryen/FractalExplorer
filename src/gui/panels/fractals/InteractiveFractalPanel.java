@@ -165,8 +165,7 @@ public class InteractiveFractalPanel extends FractalPanel
                 bottomy = this.starty;
             }
 
-            System.out.println("Painting over ("+leftx+", "+topy+", "+(rightx - leftx + 1)+", "+(bottomy - topy + 1)+")");
-            this.paintRect(g, leftx, topy, rightx - leftx + 1, bottomy - topy + 1);
+            this.paintRect(g, leftx, topy, rightx - leftx + 2, bottomy - topy + 2);
 
             if (this.startx <= this.endx)
             {
@@ -190,7 +189,6 @@ public class InteractiveFractalPanel extends FractalPanel
             }
             //Draw the new rectangle
             g.setColor(Color.CYAN);
-            System.out.println("Drawing ("+leftx+", "+topy+", "+(rightx - leftx + 1)+", "+(bottomy - topy + 1)+")");
             g.drawRect(leftx, topy, rightx - leftx + 1, bottomy - topy + 1);
 
             this.endy_old = this.endy;

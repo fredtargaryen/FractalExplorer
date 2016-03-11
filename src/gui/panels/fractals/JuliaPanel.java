@@ -83,12 +83,4 @@ public class JuliaPanel extends FractalPanel
             this.processedNextTerm = "";
         }
     }
-
-    @Override
-    public void paintComponent(Graphics g)
-    {
-        if (FractalDisplay.getMainWindow().getTopDisplay().getLastPoint() != null) {
-            super.paintComponent(g);
-        }
-    }
 }
