@@ -83,6 +83,7 @@ public class FractalDisplay extends JFrame
         this.bottomDisplay = new DisplayParameterPanel();
         this.juliaImage = new JuliaPanel();
         this.leftImage = mandel;
+        this.juliaImage.linkPanel(mandel);
         this.topDisplay = new PointSelectionPanel();
         this.fractSelect = new FractalSelectPanel();
 

@@ -73,6 +73,11 @@ public class FractalPanel extends JPanel
      */
     protected Complex[] userComplexes;
 
+    //Binary operators and the comma need to protect the operand before them, or it could be operated on by subsequent
+    //operators.
+    protected int noOfProtectedDoubles;
+    protected int noOfProtectedComplexes;
+
     /**
      * 10 because the numbers 0-9 can be easily used to reference a user value with just one character.
      */
@@ -105,6 +110,8 @@ public class FractalPanel extends JPanel
         this.userComplexStrings = new String[NO_OF_ALLOWED_USER_VALUES];
         this.userComplexes = new Complex[NO_OF_ALLOWED_USER_VALUES];
         this.orbit = Orbit.NONE;
+        this.noOfProtectedDoubles = 0;
+        this.noOfProtectedComplexes = 0;
     }
 
     /**
@@ -310,10 +317,9 @@ public class FractalPanel extends JPanel
         //True if a double was last pushed; false if a Complex.
         boolean doubleLastPushed = true;
         int stringLength = s.length();
-        //Binary operators need to protect the operand before them, or it will be operated on by subsequent operators.
-        //This includes the comma.
-        int noOfProtectedDoubles = 0;
-        int noOfProtectedComplexes = 0;
+
+        //Points to the next complex number in userComplexes to be checked for the first time.
+        int nextComplexToCheck = 0;
         //When an item is pushed that cannot lead directly to some double or Complex processing, this is set to false
         //to minimize the number of times the program has to enter the stack loop.
         boolean enterStackLoop;
@@ -334,29 +340,29 @@ public class FractalPanel extends JPanel
             {
                 //There is a user-defined complex here
                 ++x;
-                int complexIndex = Integer.parseInt(s.substring(x, x + 1));
                 //The number after C is the position in userComplexStrings or userComplexes of the desired complex
-                if(this.userComplexes[complexIndex] == null)
+                int complexIndex = Integer.parseInt(s.substring(x, x + 1));
+                //If the index is pointing to a complex that has not been calculated yet, and the string is null
+                //so calculation is required:
+                if(complexIndex >= nextComplexToCheck && this.userComplexStrings[complexIndex] != null)
                 {
                     //Protect all current stack items while parsing
-                    int prevCompProtect = noOfProtectedComplexes;
-                    noOfProtectedComplexes = this.complexStack.size();
-                    int prevDoubProtect = noOfProtectedDoubles;
-                    noOfProtectedDoubles = this.doubleStack.size();
+                    int prevCompProtect = this.noOfProtectedComplexes;
+                    this.noOfProtectedComplexes = this.complexStack.size();
+                    int prevDoubProtect = this.noOfProtectedDoubles;
+                    this.noOfProtectedDoubles = this.doubleStack.size();
 
-                    //Parse the corresponding string and store the result
+                    //Parse the corresponding string and store the result at complexIndex
                     this.userComplexes[complexIndex] = this.parseComplex(this.userComplexStrings[complexIndex], prev, first, currentPoint, userPoint);
-                    
+                    ++nextComplexToCheck;
                     //Stop reserving items
-                    noOfProtectedComplexes = prevCompProtect;
-                    noOfProtectedDoubles = prevDoubProtect;
+                    this.noOfProtectedComplexes = prevCompProtect;
+                    this.noOfProtectedDoubles = prevDoubProtect;
                 }
-                if(this.userComplexes[complexIndex] != null)
-                {
-                    //The complex value is already calculated and available in userComplexes.
-                    this.complexStack.push(this.userComplexes[complexIndex].clone());
-                    doubleLastPushed = false;
-                }
+                //At this point the complex value at complexIndex will already be calculated and available in
+                //userComplexes.
+                this.complexStack.push(this.userComplexes[complexIndex].clone());
+                doubleLastPushed = false;
             }
             else if (currentChar == 'p') {
                 this.complexStack.push(prev.clone());
@@ -377,18 +383,18 @@ public class FractalPanel extends JPanel
             }
             else if(currentChar == ',')
             {
-                ++noOfProtectedDoubles;
+                ++this.noOfProtectedDoubles;
                 this.operatorStack.push(currentChar);
             }
             else if(this.isBinaryOperator(currentChar))
             {
                 if(doubleLastPushed)
                 {
-                    ++noOfProtectedDoubles;
+                    ++this.noOfProtectedDoubles;
                 }
                 else
                 {
-                    ++noOfProtectedComplexes;
+                    ++this.noOfProtectedComplexes;
                 }
                 this.operatorStack.push(currentChar);
             }
@@ -418,10 +424,10 @@ public class FractalPanel extends JPanel
                         if(doubleLastPushed)
                         {
                             int doubStackSize = this.doubleStack.size();
-                            if (doubStackSize > noOfProtectedDoubles) {
+                            if (doubStackSize > this.noOfProtectedDoubles) {
                                 this.doubleStack.push(this.doubleStack.pop() + this.doubleStack.pop());
                                 this.operatorStack.pop();
-                                --noOfProtectedDoubles;
+                                --this.noOfProtectedDoubles;
                                 --opStackSize;
                             }
                             else
@@ -431,10 +437,10 @@ public class FractalPanel extends JPanel
                         }
                         else {
                             int compStackSize = this.complexStack.size();
-                            if (compStackSize > noOfProtectedComplexes) {
+                            if (compStackSize > this.noOfProtectedComplexes) {
                                 this.complexStack.push(this.complexStack.pop().add(this.complexStack.pop()));
                                 this.operatorStack.pop();
-                                --noOfProtectedComplexes;
+                                --this.noOfProtectedComplexes;
                                 --opStackSize;
                             } else {
                                 exitStackLoop = true;
@@ -446,12 +452,12 @@ public class FractalPanel extends JPanel
                         if(doubleLastPushed)
                         {
                             int doubStackSize = this.doubleStack.size();
-                            if (doubStackSize > noOfProtectedDoubles)
+                            if (doubStackSize > this.noOfProtectedDoubles)
                             {
                                 Double toSubtract = this.doubleStack.pop();
                                 this.doubleStack.push(this.doubleStack.pop() - toSubtract);
                                 this.operatorStack.pop();
-                                --noOfProtectedDoubles;
+                                --this.noOfProtectedDoubles;
                                 --opStackSize;
                             }
                             else
@@ -460,12 +466,12 @@ public class FractalPanel extends JPanel
                             }
                         }
                         else {
-                            if (this.complexStack.size() > noOfProtectedComplexes) {
+                            if (this.complexStack.size() > this.noOfProtectedComplexes) {
                                 Complex complexToSubtract = this.complexStack.pop();
                                 complexToSubtract = new Complex(-complexToSubtract.getRealPart(), -complexToSubtract.getImagPart());
                                 this.complexStack.push(this.complexStack.pop().add(complexToSubtract));
                                 this.operatorStack.pop();
-                                --noOfProtectedComplexes;
+                                --this.noOfProtectedComplexes;
                                 --opStackSize;
                             } else {
                                 exitStackLoop = true;
@@ -477,10 +483,10 @@ public class FractalPanel extends JPanel
                         if(doubleLastPushed)
                         {
                             int doubStackSize = this.doubleStack.size();
-                            if (doubStackSize > noOfProtectedDoubles) {
+                            if (doubStackSize > this.noOfProtectedDoubles) {
                                 this.doubleStack.push(this.doubleStack.pop() * this.doubleStack.pop());
                                 this.operatorStack.pop();
-                                --noOfProtectedDoubles;
+                                --this.noOfProtectedDoubles;
                                 --opStackSize;
                             }
                             else
@@ -490,10 +496,10 @@ public class FractalPanel extends JPanel
                         }
                         else {
                             int compStackSize = this.complexStack.size();
-                            if (compStackSize > noOfProtectedComplexes) {
+                            if (compStackSize > this.noOfProtectedComplexes) {
                                 this.complexStack.push(this.complexStack.pop().multiplyBy(this.complexStack.pop()));
                                 this.operatorStack.pop();
-                                --noOfProtectedComplexes;
+                                --this.noOfProtectedComplexes;
                                 --opStackSize;
                             } else {
                                 exitStackLoop = true;
@@ -501,7 +507,7 @@ public class FractalPanel extends JPanel
                         }
                     }
                     else if (topOperator == 'a') {
-                        if (this.doubleStack.size() >= noOfProtectedDoubles + 1) {
+                        if (this.doubleStack.size() >= this.noOfProtectedDoubles + 1) {
                             this.doubleStack.push(Math.abs(this.doubleStack.pop()));
                             this.operatorStack.pop();
                             --opStackSize;
@@ -509,7 +515,7 @@ public class FractalPanel extends JPanel
                             exitStackLoop = true;
                         }
                     } else if (topOperator == 'r') {
-                        if (this.complexStack.size() >= noOfProtectedComplexes + 1) {
+                        if (this.complexStack.size() >= this.noOfProtectedComplexes + 1) {
                             this.doubleStack.push(this.complexStack.pop().getRealPart());
                             this.operatorStack.pop();
                             --opStackSize;
@@ -517,7 +523,7 @@ public class FractalPanel extends JPanel
                             exitStackLoop = true;
                         }
                     } else if (topOperator == 'i') {
-                        if (this.complexStack.size() >= noOfProtectedComplexes + 1) {
+                        if (this.complexStack.size() >= this.noOfProtectedComplexes + 1) {
                             this.doubleStack.push(this.complexStack.pop().getImagPart());
                             this.operatorStack.pop();
                             --opStackSize;
@@ -533,20 +539,13 @@ public class FractalPanel extends JPanel
                         this.complexStack.push(new Complex(this.doubleStack.pop(), imagPart));
                         this.operatorStack.pop();
                         this.operatorStack.pop();
-                        --noOfProtectedDoubles;
+                        --this.noOfProtectedDoubles;
                         this.operatorStack.pop();
                         opStackSize -= 3;
                     }
                 }
             }
             ++x;
-        }
-        for(int index = 0; index < this.userComplexStrings.length; ++index)
-        {
-            if(this.userComplexStrings[index] != null)
-            {
-                this.userComplexes[index] = null;
-            }
         }
         return this.complexStack.pop();
     }

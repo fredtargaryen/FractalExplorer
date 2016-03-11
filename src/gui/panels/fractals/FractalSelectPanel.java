@@ -54,7 +54,7 @@ public class FractalSelectPanel extends JPanel
                                 " numbers.\n" +
                                 "*Ordering: Brackets are not valid (yet) so values are evaluated from left to right, i.e.\n" +
                                 " 2+3*2 = 10\n" +
-                                "*Example: The formula for the Burning Ship fractal is 'c;[arp,aip]*[arp,aip]+c", "Create New Fractal", JOptionPane.PLAIN_MESSAGE);
+                                "*Example: The formula for the Burning Ship fractal is 'c;[arp,aip]*[arp,aip]+c'", "Create New Fractal", JOptionPane.PLAIN_MESSAGE);
                 if(rawInstructions != null)
                 {
                     InteractiveFractalPanel ifp = new InteractiveFractalPanel();
