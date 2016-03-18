@@ -22,9 +22,11 @@ import gui.FractalDisplay;
  */
 
 /**
+ * TODO parseExpression
  * TODO Double painting at beginning?
  *
  * TODO Slow fractal generation
+ * TODO Exponents
  * TODO - as unary operator as well
  */
 public class Main

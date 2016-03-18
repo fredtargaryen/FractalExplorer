@@ -54,6 +54,8 @@ public class FractalSelectPanel extends JPanel
                                 " numbers.\n" +
                                 "*Ordering: Brackets are not valid (yet) so values are evaluated from left to right, i.e.\n" +
                                 " 2+3*2 = 10\n" +
+                                "*To attempt to generate Julia sets for your fractal, the first term must be 'c' and the\n" +
+                                " next term rule must end with '+c'.\n" +
                                 "*Example: The formula for the Burning Ship fractal is 'c;[arp,aip]*[arp,aip]+c'", "Create New Fractal", JOptionPane.PLAIN_MESSAGE);
                 if(rawInstructions != null)
                 {

@@ -4,9 +4,11 @@ import exceptions.InvalidInstructionsException;
 import gui.FractalDisplay;
 import gui.panels.info.DisplayParameterPanel;
 import numbers.Complex;
+import org.omg.CORBA.DynAnyPackage.Invalid;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.Stack;
 
 public class FractalPanel extends JPanel
@@ -27,11 +29,6 @@ public class FractalPanel extends JPanel
     private Stack<Double> doubleStack;
 
     /**
-     * Stack of symbols in the expression being parsed, which determine the calculations to be done.
-     */
-    private Stack<Character> operatorStack;
-
-    /**
      * The instruction string as entered by the user.
      */
     protected String rawInstructions;
@@ -39,12 +36,12 @@ public class FractalPanel extends JPanel
     /**
      * The definition of the iteration sequence's first term, validated and edited by the program for faster processing.
      */
-    protected String processedFirstTerm;
+    protected String[] processedFirstTerm;
 
     /**
      * The definition of the iteration sequence's next term, validated and edited by the program for faster processing.
      */
-    protected String processedNextTerm;
+    protected String[] processedNextTerm;
 
     /**
      * Stores up to 10 unique strings representing user-defined numerical values.
@@ -59,7 +56,7 @@ public class FractalPanel extends JPanel
      * parseComplex(userComplexStrings[x], ...) must be called.
      * If there is no value, the complex value is constant, so it can be acquired directly from userComplexes[x].
      */
-    protected String[] userComplexStrings;
+    protected String[][] userComplexStrings;
 
     /**
      * Stores up to 10 unique user-defined complex numbers, that do not need to be recalculated.
@@ -102,12 +99,11 @@ public class FractalPanel extends JPanel
         this.setPreferredSize(new Dimension(600, 600));
         this.complexStack = new Stack<Complex>();
         this.doubleStack = new Stack<Double>();
-        this.operatorStack = new Stack<Character>();
         this.rawInstructions = "";
-        this.processedFirstTerm = "";
-        this.processedNextTerm = "";
+        this.processedFirstTerm = new String[0];
+        this.processedNextTerm = new String[0];
         this.userDoubles = new Double[NO_OF_ALLOWED_USER_VALUES];
-        this.userComplexStrings = new String[NO_OF_ALLOWED_USER_VALUES];
+        this.userComplexStrings = new String[0][NO_OF_ALLOWED_USER_VALUES];
         this.userComplexes = new Complex[NO_OF_ALLOWED_USER_VALUES];
         this.orbit = Orbit.NONE;
         this.noOfProtectedDoubles = 0;
@@ -158,37 +154,34 @@ public class FractalPanel extends JPanel
     public void paintRect(Graphics g, int rectx, int recty, int width, int height)
     {
         Complex userSelectedPoint = FractalDisplay.getMainWindow().getTopDisplay().getLastPoint();
-        if(userSelectedPoint != null || (!this.processedFirstTerm.contains("u") && !this.processedNextTerm.contains("u")))
-        {
-            this.iterations = FractalDisplay.getMainWindow().getParamPanel().getIterations();
+        this.iterations = FractalDisplay.getMainWindow().getParamPanel().getIterations();
 
-            //The Complex whose corresponding pixel is currently being coloured in the FractalPanel
-            Complex currentPoint;
+        //The Complex whose corresponding pixel is currently being coloured in the FractalPanel
+        Complex currentPoint;
 
-            //The first term in the iteration sequence for this fractal
-            Complex firstTerm;
+        //The first term in the iteration sequence for this fractal
+        Complex firstTerm;
 
-            //The previous term in the iteration sequence for this fractal
-            Complex prevSeqValue;
+        //The previous term in the iteration sequence for this fractal
+        Complex prevSeqValue;
 
-            int iterationsManaged;
+        int iterationsManaged;
 
-            //Stops the while loop if the escape condition is satisfied.
-            for (int y = recty; y < recty + height; ++y) {
-                for (int x = rectx; x < rectx + width; ++x) {
-                    currentPoint = this.getPanelCoordsAsComplex(x, y);
+        //Stops the while loop if the escape condition is satisfied.
+        for (int y = recty; y < recty + height; ++y) {
+            for (int x = rectx; x < rectx + width; ++x) {
+                currentPoint = this.getPanelCoordsAsComplex(x, y);
 
-                    firstTerm = this.parseComplex(this.processedFirstTerm, null, null, currentPoint, userSelectedPoint);
-                    iterationsManaged = 0;
-                    prevSeqValue = firstTerm.clone();
-                    while (!this.escape(prevSeqValue) && iterationsManaged < this.iterations + 1) {
-                        ++iterationsManaged;
-                        //Uses next term rule to determine how to reach the next term
-                        prevSeqValue = this.parseComplex(this.processedNextTerm, prevSeqValue, firstTerm, currentPoint, userSelectedPoint);
-                    }
-                    g.setColor(this.chooseColour(prevSeqValue, iterationsManaged));
-                    g.drawLine(x, y, x, y);
+                firstTerm = this.parseComplex(this.processedFirstTerm, null, null, currentPoint, userSelectedPoint);
+                iterationsManaged = 0;
+                prevSeqValue = firstTerm.clone();
+                while (!this.escape(prevSeqValue) && iterationsManaged < this.iterations + 1) {
+                    ++iterationsManaged;
+                    //Uses next term rule to determine how to reach the next term
+                    prevSeqValue = this.parseComplex(this.processedNextTerm, prevSeqValue, firstTerm, currentPoint, userSelectedPoint);
                 }
+                g.setColor(this.chooseColour(prevSeqValue, iterationsManaged));
+                g.drawLine(x, y, x, y);
             }
         }
     }
@@ -225,6 +218,7 @@ public class FractalPanel extends JPanel
                 double realPart = Math.abs(point.getRealPart());
                 double imagPart = Math.abs(point.getImagPart());
                 return realPart >= imagPart - 0.05 && realPart <= imagPart + 0.05;
+
             default:
                 //The default: sequence terminates when modulus >= 2 (squared modulus >= 4).
                 return point.modulusSquared() >= 4.0;
@@ -240,10 +234,10 @@ public class FractalPanel extends JPanel
         {
             case CIRCLE:
                 double distance = Math.sqrt(point.modulusSquared());
-                if(distance <= 0.5)
+                if(distance <= 0.25)
                 {
-                    float colourDist = 0.5F - (float) distance;
-                    return new Color(2 * colourDist, 0, colourDist);
+                    float colourDist = 0.25F - (float) distance;
+                    return new Color(4 * colourDist, 0, colourDist);
                 }
                 else
                 {
@@ -300,252 +294,115 @@ public class FractalPanel extends JPanel
     /**
      * Any instruction strings specified in the code are tested and valid, and any strings entered by the user are only
      * made available if they pass validateInstructions, so that s can be assumed to be valid. Any conditions not
-     * covered in this method, such as the stacks being empty when a binary operator is processed, are therefore not
-     * going to occur.
-     * @param s a valid string to be parsed.
+     * covered in this method, such as the stacks being empty when a binary operator is processed, should therefore not
+     * occur.
+     * @param comp a valid expression to be parsed.
      * @param prev the previous Complex in the sequence
      * @param first the first Complex in the sequence
      * @param currentPoint the current point being drawn on the panel
      * @param userPoint the last point selected by the user
      * @return the Complex that is described by these instructions
      */
-    private Complex parseComplex(String s, Complex prev, Complex first, Complex currentPoint, Complex userPoint)
+    private Complex parseComplex(String[] comp, Complex prev, Complex first, Complex currentPoint, Complex userPoint)
     {
-        int x = 0;
-        char currentChar;
-        //Used by binary operators to check if they are operating on doubles or Complexes.
-        //True if a double was last pushed; false if a Complex.
-        boolean doubleLastPushed = true;
-        int stringLength = s.length();
-
         //Points to the next complex number in userComplexes to be checked for the first time.
         int nextComplexToCheck = 0;
-        //When an item is pushed that cannot lead directly to some double or Complex processing, this is set to false
-        //to minimize the number of times the program has to enter the stack loop.
-        boolean enterStackLoop;
-        while(x < stringLength)
+        String currentString;
+        char currentFirstChar;
+        for(int x = 0; x < comp.length; ++x)
         {
-            enterStackLoop = true;
-            currentChar = s.charAt(x);
-
-            if(currentChar == 'D')
+            currentString = comp[x];
+            currentFirstChar = currentString.charAt(0);
+            if(currentFirstChar == 'p')
+            {
+                this.complexStack.push(prev.clone());
+            }
+            else if(currentFirstChar == 'u')
+            {
+                this.complexStack.push(userPoint.clone());
+            }
+            else if(currentFirstChar == 'c')
+            {
+                this.complexStack.push(currentPoint.clone());
+            }
+            else if(currentFirstChar == 'f')
+            {
+                this.complexStack.push(first.clone());
+            }
+            else if(currentFirstChar == '*')
+            {
+                char secondChar = currentString.charAt(1);
+                if(secondChar == 'C')
+                {
+                    this.complexStack.push(this.complexStack.pop().multiplyBy(this.complexStack.pop()));
+                }
+                else if(secondChar == 'D')
+                {
+                    this.doubleStack.push(this.doubleStack.pop() * this.doubleStack.pop());
+                }
+            }
+            else if(currentFirstChar == '+')
+            {
+                char secondChar = currentString.charAt(1);
+                if(secondChar == 'C')
+                {
+                    this.complexStack.push(this.complexStack.pop().add(this.complexStack.pop()));
+                }
+                else if(secondChar == 'D')
+                {
+                    this.doubleStack.push(this.doubleStack.pop() + this.doubleStack.pop());
+                }
+            }
+            else if(currentFirstChar == '-')
+            {
+                char secondChar = currentString.charAt(1);
+                //Subtraction is not commutative, so order needs to be preserved
+                if(secondChar == 'C')
+                {
+                    Complex newerComp = this.complexStack.pop();
+                    this.complexStack.push(this.complexStack.pop()
+                            .add(new Complex(-newerComp.getRealPart(), -newerComp.getImagPart())));
+                }
+                else if(secondChar == 'D')
+                {
+                    double newerDoub = this.doubleStack.pop();
+                    this.doubleStack.push(this.doubleStack.pop() - newerDoub);
+                }
+            }
+            else if(currentFirstChar == 'a')
+            {
+                this.doubleStack.push(Math.abs(this.doubleStack.pop()));
+            }
+            else if(currentFirstChar == 'r')
+            {
+                this.doubleStack.push(this.complexStack.pop().getRealPart());
+            }
+            else if(currentFirstChar == 'i')
+            {
+                this.doubleStack.push(this.complexStack.pop().getImagPart());
+            }
+            else if(currentFirstChar == 'D')
             {
                 //There is a user-defined double here
-                ++x;
-                //The number after D is the position in userDoubles of the desired double
-                this.doubleStack.push(this.userDoubles[Integer.parseInt(s.substring(x, x + 1))]);
-                doubleLastPushed = true;
+                this.doubleStack.push(this.userDoubles[Integer.parseInt(currentString.substring(1))]);
             }
-            else if(currentChar == 'C')
+            else if(currentFirstChar == 'C')
             {
                 //There is a user-defined complex here
-                ++x;
                 //The number after C is the position in userComplexStrings or userComplexes of the desired complex
-                int complexIndex = Integer.parseInt(s.substring(x, x + 1));
-                //If the index is pointing to a complex that has not been calculated yet, and the string is null
-                //so calculation is required:
+                int complexIndex = Integer.parseInt(currentString.substring(1));
                 if(complexIndex >= nextComplexToCheck && this.userComplexStrings[complexIndex] != null)
                 {
-                    //Protect all current stack items while parsing
-                    int prevCompProtect = this.noOfProtectedComplexes;
-                    this.noOfProtectedComplexes = this.complexStack.size();
-                    int prevDoubProtect = this.noOfProtectedDoubles;
-                    this.noOfProtectedDoubles = this.doubleStack.size();
-
+                    //The index is pointing to a complex that has not been calculated yet, AND the string is null
+                    //so calculation is required.
                     //Parse the corresponding string and store the result at complexIndex
                     this.userComplexes[complexIndex] = this.parseComplex(this.userComplexStrings[complexIndex], prev, first, currentPoint, userPoint);
                     ++nextComplexToCheck;
-                    //Stop reserving items
-                    this.noOfProtectedComplexes = prevCompProtect;
-                    this.noOfProtectedDoubles = prevDoubProtect;
                 }
-                //At this point the complex value at complexIndex will already be calculated and available in
+                //At this point the complex value at complexIndex will have been calculated and will be available in
                 //userComplexes.
                 this.complexStack.push(this.userComplexes[complexIndex].clone());
-                doubleLastPushed = false;
             }
-            else if (currentChar == 'p') {
-                this.complexStack.push(prev.clone());
-                doubleLastPushed = false;
-            }
-            else if(currentChar == 'u') {
-                this.complexStack.push(userPoint.clone());
-                doubleLastPushed = false;
-            }
-            else if(currentChar == 'c') {
-                this.complexStack.push(currentPoint.clone());
-                doubleLastPushed = false;
-            }
-            else if(currentChar == 'f')
-            {
-                this.complexStack.push(first.clone());
-                doubleLastPushed = false;
-            }
-            else if(currentChar == ',')
-            {
-                ++this.noOfProtectedDoubles;
-                this.operatorStack.push(currentChar);
-            }
-            else if(this.isBinaryOperator(currentChar))
-            {
-                if(doubleLastPushed)
-                {
-                    ++this.noOfProtectedDoubles;
-                }
-                else
-                {
-                    ++this.noOfProtectedComplexes;
-                }
-                this.operatorStack.push(currentChar);
-            }
-            else if(currentChar == ']')
-            {
-                this.operatorStack.push(currentChar);
-            }
-            else
-            {
-                //The character is a unary operator or [, so it can be pushed straight on and there is no need to
-                //enter the stack loop.
-                this.operatorStack.push(currentChar);
-                enterStackLoop = false;
-            }
-
-            //The stack loop pops and processes as many operators as it can before exitStackLoop gets set to true.
-            if(enterStackLoop)
-            {
-                char topOperator;
-                //Used for characters that are waiting for more operands and so are not ready to take from the stack.
-                boolean exitStackLoop = false;
-                int opStackSize = this.operatorStack.size();
-                while (opStackSize > 0 && !exitStackLoop) {
-                    topOperator = this.operatorStack.peek();
-                    if (topOperator == '+')
-                    {
-                        if(doubleLastPushed)
-                        {
-                            int doubStackSize = this.doubleStack.size();
-                            if (doubStackSize > this.noOfProtectedDoubles) {
-                                this.doubleStack.push(this.doubleStack.pop() + this.doubleStack.pop());
-                                this.operatorStack.pop();
-                                --this.noOfProtectedDoubles;
-                                --opStackSize;
-                            }
-                            else
-                            {
-                                exitStackLoop = true;
-                            }
-                        }
-                        else {
-                            int compStackSize = this.complexStack.size();
-                            if (compStackSize > this.noOfProtectedComplexes) {
-                                this.complexStack.push(this.complexStack.pop().add(this.complexStack.pop()));
-                                this.operatorStack.pop();
-                                --this.noOfProtectedComplexes;
-                                --opStackSize;
-                            } else {
-                                exitStackLoop = true;
-                            }
-                        }
-                    }
-                    else if(topOperator == '-')
-                    {
-                        if(doubleLastPushed)
-                        {
-                            int doubStackSize = this.doubleStack.size();
-                            if (doubStackSize > this.noOfProtectedDoubles)
-                            {
-                                Double toSubtract = this.doubleStack.pop();
-                                this.doubleStack.push(this.doubleStack.pop() - toSubtract);
-                                this.operatorStack.pop();
-                                --this.noOfProtectedDoubles;
-                                --opStackSize;
-                            }
-                            else
-                            {
-                                exitStackLoop = true;
-                            }
-                        }
-                        else {
-                            if (this.complexStack.size() > this.noOfProtectedComplexes) {
-                                Complex complexToSubtract = this.complexStack.pop();
-                                complexToSubtract = new Complex(-complexToSubtract.getRealPart(), -complexToSubtract.getImagPart());
-                                this.complexStack.push(this.complexStack.pop().add(complexToSubtract));
-                                this.operatorStack.pop();
-                                --this.noOfProtectedComplexes;
-                                --opStackSize;
-                            } else {
-                                exitStackLoop = true;
-                            }
-                        }
-                    }
-                    else if (topOperator == '*')
-                    {
-                        if(doubleLastPushed)
-                        {
-                            int doubStackSize = this.doubleStack.size();
-                            if (doubStackSize > this.noOfProtectedDoubles) {
-                                this.doubleStack.push(this.doubleStack.pop() * this.doubleStack.pop());
-                                this.operatorStack.pop();
-                                --this.noOfProtectedDoubles;
-                                --opStackSize;
-                            }
-                            else
-                            {
-                                exitStackLoop = true;
-                            }
-                        }
-                        else {
-                            int compStackSize = this.complexStack.size();
-                            if (compStackSize > this.noOfProtectedComplexes) {
-                                this.complexStack.push(this.complexStack.pop().multiplyBy(this.complexStack.pop()));
-                                this.operatorStack.pop();
-                                --this.noOfProtectedComplexes;
-                                --opStackSize;
-                            } else {
-                                exitStackLoop = true;
-                            }
-                        }
-                    }
-                    else if (topOperator == 'a') {
-                        if (this.doubleStack.size() >= this.noOfProtectedDoubles + 1) {
-                            this.doubleStack.push(Math.abs(this.doubleStack.pop()));
-                            this.operatorStack.pop();
-                            --opStackSize;
-                        } else {
-                            exitStackLoop = true;
-                        }
-                    } else if (topOperator == 'r') {
-                        if (this.complexStack.size() >= this.noOfProtectedComplexes + 1) {
-                            this.doubleStack.push(this.complexStack.pop().getRealPart());
-                            this.operatorStack.pop();
-                            --opStackSize;
-                        } else {
-                            exitStackLoop = true;
-                        }
-                    } else if (topOperator == 'i') {
-                        if (this.complexStack.size() >= this.noOfProtectedComplexes + 1) {
-                            this.doubleStack.push(this.complexStack.pop().getImagPart());
-                            this.operatorStack.pop();
-                            --opStackSize;
-                        } else {
-                            exitStackLoop = true;
-                        }
-                    } else if (topOperator == '[' || topOperator == ',') {
-                        exitStackLoop = true;
-                    }
-                    //The top symbol must be ]
-                    else {
-                        double imagPart = this.doubleStack.pop();
-                        this.complexStack.push(new Complex(this.doubleStack.pop(), imagPart));
-                        this.operatorStack.pop();
-                        this.operatorStack.pop();
-                        --this.noOfProtectedDoubles;
-                        this.operatorStack.pop();
-                        opStackSize -= 3;
-                    }
-                }
-            }
-            ++x;
         }
         return this.complexStack.pop();
     }
@@ -600,149 +457,397 @@ public class FractalPanel extends JPanel
                 throw new InvalidInstructionsException("Cannot use the character p when defining the first term.");
             }
         }
-
-        //Loops through the string to check for user-defined doubles. If any are found, they are added to userDoubles
-        //and replaced with a reference to an item of userDoubles, for faster processing later on.
-        int possValueStartIndex = -1;
-        String doublesRemovedInstructions = "";
-        String nextValueString = "";
-        int x = 0;
-        while (x < rawInstructions.length())
+        ArrayList<String> firstTermParts;
+        String[] postfixFirstTerm;
+        ArrayList<String> nextTermParts;
+        String[] postfixNextTerm;
+        try
         {
-            currentChar = rawInstructions.charAt(x);
-            if (this.isSpecialComplex(currentChar) || this.isUnaryOperator(currentChar) ||
-                    this.isBinaryOperator(currentChar) || currentChar == '[' || currentChar == ',' || currentChar == ']'
-                    || currentChar == ';')
-            {
-                //currentChar can't possibly be part of a double
-                if (possValueStartIndex > -1)
-                {
-                    //The method has detected the start of a new double before
-                    try
-                    {
-                        //Replaces the user double with D followed by the index returned by addNewUserDouble,
-                        //effectively pointing to the double in userDoubles.
-                        doublesRemovedInstructions += rawInstructions.substring(0, possValueStartIndex) + "D"
-                                + this.addNewUserDouble(rawInstructions.substring(possValueStartIndex, x));
-                    }
-                    catch(NumberFormatException nfe)
-                    {
-                        //The double string wasn't a valid double
-                        throw new InvalidInstructionsException("'"+nextValueString+"' is not a valid number.");
-                    }
-                    catch(ArrayIndexOutOfBoundsException aioobe)
-                    {
-                        //The array was full so numberToTry went out of range
-                        throw new InvalidInstructionsException("Too many numbers have been defined.");
-                    }
+            firstTermParts = this.breakUpExpression(firstTerm);
+            postfixFirstTerm = this.setInfixListToPostfix(firstTermParts);
+            nextTermParts = this.breakUpExpression(instructionParts[1]);
+            postfixNextTerm = this.setInfixListToPostfix(nextTermParts);
+        }
+        catch(InvalidInstructionsException iie)
+        {
+            throw iie;
+        }
 
-                    //Restarts the search for doubles using the rest of rawInstructions
-                    rawInstructions = rawInstructions.substring(x);
-                    x = 0;
-                    possValueStartIndex = -1;
-                }
+        //Loops through the list to check for user-defined doubles. If any are found, they are added to userDoubles
+        //and replaced with a reference to an item of userDoubles, for faster processing later on.
+        int x = 0;
+        String currentString;
+        while (x < postfixFirstTerm.length)
+        {
+            currentString = postfixFirstTerm[x];
+            if(this.isComplex(currentString) || this.isBinaryOperator(currentString.charAt(0))
+                    || this.isUnaryOperator(currentString.charAt(0)))
+            {
+                ++x;
             }
             else
             {
-                //This character could be the start of a double.
-                if (possValueStartIndex == -1) {
-                    possValueStartIndex = x;
-                }
-            }
-            ++x;
-        }
-        //The whole string has been looped through.
-        if (possValueStartIndex > -1)
-        {
-            //There is one more possible double left over
-            doublesRemovedInstructions += rawInstructions.substring(0, possValueStartIndex) + "D"
-                    + this.addNewUserDouble(rawInstructions.substring(possValueStartIndex));
-        } else {
-            //There are some operators and/or complexes left over
-            doublesRemovedInstructions += rawInstructions;
-        }
-
-        //Loops through the string again, to check for user-defined complex numbers. If any are found, they are added to
-        //one of two arrays and replaced with a reference to an item of userComplexStrings, for faster processing later
-        //on.
-        possValueStartIndex = -1;
-        String complexesRemovedInstructions = "";
-        nextValueString = "";
-        x = 0;
-        while (x < doublesRemovedInstructions.length())
-        {
-            currentChar = doublesRemovedInstructions.charAt(x);
-            if(currentChar == '[') {
-                //This character could be the start of a complex.
-                if (possValueStartIndex == -1) {
-                    possValueStartIndex = x;
-                } else {
-                    //The user is starting a new complex inside a new complex - not allowed
-                    throw new InvalidInstructionsException("Cannot create a new complex number inside one that is still being created.");
-                }
-            }
-            else if(currentChar == ']')
-            {
-                //This character could be the end of a valid complex.
-                if(possValueStartIndex == -1)
+                if(this.isDouble(currentString))
                 {
-                    //Closing bracket before an opening bracket
-                    throw new InvalidInstructionsException("Cannot use ']' without a '[' before it.");
+                    int userDoubleIndex = this.addNewUserDouble(currentString);
+                    postfixFirstTerm[x] = "D"+userDoubleIndex;
+                    ++x;
                 }
                 else
                 {
-                    nextValueString = doublesRemovedInstructions.substring(possValueStartIndex, x + 1);
-                    //Replaces the user complex with C followed by the index returned by addNewUserComplex,
-                    //effectively pointing to the complex in userComplexes.
-                    try
-                    {
-                        complexesRemovedInstructions += doublesRemovedInstructions.substring(0, possValueStartIndex) + "C"
-                                + this.addNewUserComplex(nextValueString);
-                    }
-                    catch(NumberFormatException nfe)
-                    {
-                        //The complex string wasn't valid
-                        throw new InvalidInstructionsException("'"+nextValueString+"' is not a valid complex number.");
-                    }
-                    catch(ArrayIndexOutOfBoundsException aioobe)
-                    {
-                        //The array was full so numberToTry went out of range
-                        throw new InvalidInstructionsException("Too many complex numbers have been defined.");
-                    }
-
-                    //Restarts the search for complexes using the rest of doublesRemovedInstructions
-                    doublesRemovedInstructions = doublesRemovedInstructions.substring(x + 1);
-                    x = 0;
-                    possValueStartIndex = -1;
+                    throw new InvalidInstructionsException("'"+currentString+"' is not a valid number.");
                 }
             }
-            ++x;
-        }
-        //The whole string has been looped through.
-        if (possValueStartIndex > -1)
-        {
-            //There is one more possible Complex left over
-            complexesRemovedInstructions += doublesRemovedInstructions.substring(0, possValueStartIndex) + "C"
-                    + this.addNewUserComplex(doublesRemovedInstructions.substring(possValueStartIndex));
-        }
-        else
-        {
-            //There are some operators and/or complexes left over
-            complexesRemovedInstructions += doublesRemovedInstructions;
         }
 
-        //Checks that both sections of the instruction string evaluate to complex numbers.
-        instructionParts = complexesRemovedInstructions.split(";");
-        if (!isComplex(instructionParts[0])) {
+        //Loops through the list again, to check for user-defined complex numbers. If any are found, they are added to
+        //one of two arrays and replaced with a reference to an item of userComplexStrings, for faster processing later
+        //on.
+        x = 0;
+        while (x < postfixFirstTerm.length) {
+            currentString = postfixFirstTerm[x];
+            if (this.isDouble(currentString) || this.isBinaryOperator(currentString.charAt(0))
+                    || this.isUnaryOperator(currentString.charAt(0))) {
+                ++x;
+            } else {
+                //This character could be the start of a complex.
+                if (this.isComplex(currentString)) {
+                    int userComplexIndex = this.addNewUserComplex(currentString);
+                    postfixNextTerm[x] = "C" + userComplexIndex;
+                    ++x;
+                } else {
+                    throw new InvalidInstructionsException("'" + currentString + "' is not a valid complex number.");
+                }
+            }
+        }
+
+        //Checks that both sections of the instruction string evaluate to complex numbers, by doing a test parse of
+        //both. Failure to return a complex number means the string was invalid in a way that was not caught by the
+        //previous code.
+        Complex zero = new Complex(0, 0);
+        try
+        {
+            this.parseComplex(postfixFirstTerm, zero, zero, zero, zero);
+        }
+        catch(Exception e)
+        {
             throw new InvalidInstructionsException("The result of the first term is not a complex number.");
         }
-        if (!isComplex(instructionParts[1])) {
+        try {
+            this.parseComplex(postfixNextTerm, zero, zero, zero, zero);
+        }
+        catch(Exception e)
+        {
             throw new InvalidInstructionsException("The result of the rule for the next term is not a complex number.");
         }
 
         //At this point, the instruction string is considered valid.
-        this.processedFirstTerm = instructionParts[0];
-        this.processedNextTerm = instructionParts[1];
+        this.processedFirstTerm = postfixFirstTerm;
+        this.processedNextTerm = postfixNextTerm;
+    }
+
+    /**
+     * Rearranges the ArrayList's items to resemble a postfix expression; these are much quicker and easier to parse
+     * than infix.
+     * Brackets, division and indices are currently unsupported, but the order of evaluation is as follows:
+     * 1. Unary operators
+     * 2. Multiplication
+     * 3. Addition
+     * 4. Subtraction
+     * Also catches leading binary operators, and invalid doubles and complex numbers because it calls isDouble and
+     * isComplex.
+     */
+    private String[] setInfixListToPostfix(ArrayList<String> infixList) throws InvalidInstructionsException
+    {
+        String prevString;
+        String currentString;
+        String nextString;
+        char firstChar;
+        //Loop backwards through the list to deal with unary operators. Avoids using extra conditional branches with
+        //chained unary operators.
+        for(int x = infixList.size() - 1;  x >= 0; --x)
+        {
+            currentString = infixList.get(x);
+            if(currentString.equals("r") || currentString.equals("i"))
+            {
+                if(x == infixList.size() - 1)
+                {
+                    //Trailing unary operator
+                    throw new InvalidInstructionsException("Cannot end an expression with 'r' or 'i'.");
+                }
+                else
+                {
+                    prevString = infixList.get(x + 1);
+                    if(this.isComplex(prevString))
+                    {
+                        String newTerm = prevString + "|" + currentString;
+                        //Remove these two strings from the list and add the new one
+                        infixList.remove(x);
+                        infixList.remove(x);
+                        infixList.add(x, newTerm);
+                    }
+                    else if(this.isDouble(prevString))
+                    {
+                        throw new InvalidInstructionsException("Can only use 'r' or 'i' with a complex number.");
+                    }
+                    else
+                    {
+                        throw new InvalidInstructionsException("'"+prevString+"' is not a recognized number.");
+                    }
+                }
+            }
+            else if(currentString.equals("a"))
+            {
+                if(x == infixList.size() - 1)
+                {
+                    //Trailing unary operator
+                    throw new InvalidInstructionsException("Cannot end an expression with 'a'.");
+                }
+                else
+                {
+                    prevString = infixList.get(x + 1);
+                    if (this.isDouble(prevString)) {
+                        String newTerm = prevString + "|" + currentString;
+                        //Remove these two strings from the list and add the new one
+                        infixList.remove(x);
+                        infixList.remove(x);
+                        infixList.add(x, newTerm);
+                    } else if (this.isComplex(prevString)) {
+                        throw new InvalidInstructionsException("Can only use 'a' with a complex number.");
+                    } else {
+                        throw new InvalidInstructionsException("'" + prevString + "' is not a recognized value.");
+                    }
+                }
+            }
+        }
+
+        //In other cases, can loop through the list forwards.
+        for(int x = 0; x < infixList.size(); ++x)
+        {
+            currentString = infixList.get(x);
+            firstChar = currentString.charAt(0);
+            //Checks if currentString is a multiplication sign
+            if(firstChar == '*')
+            {
+                if(x == 0)
+                {
+                    //Leading binary operator
+                    throw new InvalidInstructionsException("Cannot start an expression with '*'.");
+                }
+                prevString = infixList.get(x - 1);
+                nextString = infixList.get(x + 1);
+                if(this.isDouble(prevString))
+                {
+                    //The previous value is a double so the next value should also be a double
+                    if(this.isDouble(nextString))
+                    {
+                        //Operating on two doubles is valid
+                        //Marks the operator as operating on doubles
+                        currentString += "D";
+                    }
+                    else if(this.isComplex(nextString))
+                    {
+                        throw new InvalidInstructionsException("Unable to multiply complex numbers with real numbers.");
+                    }
+                    else
+                    {
+                        throw new InvalidInstructionsException(nextString+" is not recognized as a valid real or complex number.");
+                    }
+                    //Group these three strings together in one string, so that they can't be separated by future
+                    //rearrangements. Adds a comma between them so they can be easily separated later.
+                    String newTerm = prevString+"|"+nextString+"|"+currentString;
+                    //Replace these three strings with the new concatenated string.
+                    infixList.remove(x - 1);
+                    infixList.remove(x - 1);
+                    infixList.remove(x - 1);
+                    infixList.add(x - 1, newTerm);
+                }
+                else if(this.isComplex(prevString))
+                {
+                    //The previous value is a complex so the next value should also be a complex
+                    if(this.isComplex(nextString))
+                    {
+                        //Operating two complexes is valid
+                        //Marks the operator as operating on complexes
+                        currentString += "C";
+                    }
+                    else if(this.isDouble(nextString))
+                    {
+                        throw new InvalidInstructionsException("Unable to multiply complex numbers with real numbers.");
+                    }
+                    else
+                    {
+                        throw new InvalidInstructionsException(nextString+" is not recognized as a valid real or complex number.");
+                    }
+                    //Group these three strings together in one string, so that they can't be separated by future
+                    //rearrangements. Adds a comma between them so they can be easily separated later.
+                    String newTerm = prevString+"|"+nextString+"|"+currentString;
+                    //Replace these three strings with the new concatenated string.
+                    infixList.remove(x - 1);
+                    infixList.remove(x - 1);
+                    infixList.remove(x - 1);
+                    infixList.add(x - 1, newTerm);
+                }
+                else
+                {
+                    throw new InvalidInstructionsException(prevString+" and "+nextString+" are not recognized as values.");
+                }
+            }
+        }
+        for(int x = 0; x < infixList.size(); ++x)
+        {
+            currentString = infixList.get(x);
+            firstChar = currentString.charAt(0);
+            //Checks if currentString is a multiplication sign
+            if(firstChar == '+' || firstChar == '-')
+            {
+                if(x == 0)
+                {
+                    //Leading binary operator
+                    throw new InvalidInstructionsException("Cannot start an expression with '+' or '-'.");
+                }
+                prevString = infixList.get(x - 1);
+                nextString = infixList.get(x + 1);
+                if(this.isDouble(prevString))
+                {
+                    //The previous value is a double so the next value should also be a double
+                    if(this.isDouble(nextString))
+                    {
+                        //Operating on two doubles is valid
+                        //Marks the operator as operating on doubles
+                        currentString += "D";
+                    }
+                    else if(this.isComplex(nextString))
+                    {
+                        throw new InvalidInstructionsException("Unable to add or subtract complex numbers with real numbers.");
+                    }
+                    else
+                    {
+                        throw new InvalidInstructionsException(nextString+" is not recognized as a valid real or complex number.");
+                    }
+                    //Group these three strings together in one string, so that they can't be separated by future
+                    //rearrangements. Adds a comma between them so they can be easily separated later.
+                    String newTerm = prevString+"|"+nextString+"|"+currentString;
+                    //Replace these three strings with the new concatenated string.
+                    infixList.remove(x - 1);
+                    infixList.remove(x - 1);
+                    infixList.remove(x - 1);
+                    infixList.add(x - 1, newTerm);
+                }
+                else if(this.isComplex(prevString))
+                {
+                    //The previous value is a complex so the next value should also be a complex
+                    if(this.isComplex(nextString))
+                    {
+                        //Operating two complexes is valid
+                        //Marks the operator as operating on complexes
+                        currentString += "C";
+                    }
+                    else if(this.isDouble(nextString))
+                    {
+                        throw new InvalidInstructionsException("Unable to add or subtract complex numbers with real numbers.");
+                    }
+                    else
+                    {
+                        throw new InvalidInstructionsException(nextString+" is not recognized as a valid real or complex number.");
+                    }
+                    //Group these three strings together in one string, so that they can't be separated by future
+                    //rearrangements. Adds a comma between them so they can be easily separated later.
+                    String newTerm = prevString+"|"+nextString+"|"+currentString;
+                    //Replace these three strings with the new concatenated string.
+                    infixList.remove(x - 1);
+                    infixList.remove(x - 1);
+                    infixList.remove(x - 1);
+                    infixList.add(x - 1, newTerm);
+                }
+                else
+                {
+                    throw new InvalidInstructionsException(prevString+" and "+nextString+" are not recognized as values.");
+                }
+            }
+        }
+        return infixList.get(0).split("\\|");
+    }
+
+    /**
+     * Splits the expression into a list of binary operators and (possible) operands, preserving order, making
+     * infix-postfix conversion easier.
+     * Catches trailing operators, leading binary operators and unbalanced square brackets, so there is no need to check
+     * for these in subsequent code.
+     * @param exp the expression to split
+     * @return the list
+     */
+    private ArrayList<String> breakUpExpression(String exp) throws InvalidInstructionsException
+    {
+        String restOfExp = exp;
+        //Set to true when a [ is found. This causes the loop to continue until a ] is found; then the whole complex
+        //can be added to the list and parsed separately.
+        boolean discoveredComplexStart = false;
+        ArrayList<String> parts = new ArrayList<String>();
+        //Start looping through the expression
+        int index = 0;
+        char currentChar;
+        while(index < restOfExp.length()) {
+            currentChar = restOfExp.charAt(index);
+            //Check for square brackets
+            if (currentChar == '[') {
+                if (discoveredComplexStart) {
+                    //User has opened a square bracket without closing a previous one first
+                    throw new InvalidInstructionsException("You must close the previous '[' before entering a new one.");
+                } else {
+                    discoveredComplexStart = true;
+                }
+            } else if (currentChar == ']') {
+                if (discoveredComplexStart) {
+                    //In a valid string, this marks the end of a valid user-defined complex.
+                    //Add the ] and everything before it to the list
+                    //However the [] were only needed to separate out the complex from the rest of the expression, so
+                    //they are not added to the list.
+                    parts.add(restOfExp.substring(1, index));
+                    if (index < restOfExp.length() - 1) {
+                        //There is leftover text to evaluate
+                        restOfExp = restOfExp.substring(index + 1);
+                    }
+                    discoveredComplexStart = false;
+                    index = -1;
+                } else {
+                    //The user added a ] before adding a [
+                    throw new InvalidInstructionsException("You must provide a '[' before you can use ']'.");
+                }
+            }
+
+            else if (!discoveredComplexStart)
+            {
+                //Break up the text as usual.
+                if (isUnaryOperator(currentChar)) {
+                    parts.add(restOfExp.substring(index, index + 1));
+                    if (index == restOfExp.length() - 1)
+                    {
+                        //There is a trailing unary operator
+                        throw new InvalidInstructionsException("Cannot end an expression with a unary operator.");
+                    }
+                    restOfExp = restOfExp.substring(index + 1);
+                    index = -1;
+                } else if (isBinaryOperator(currentChar)) {
+                    if (index == restOfExp.length() - 1) {
+                        //The binary operator is trailing, so it is missing its right operand!
+                        throw new InvalidInstructionsException("Cannot end an expression with a binary operator.");
+                    }
+                    if (index > 0) {
+                        parts.add(restOfExp.substring(0, index));
+                    }
+
+                    parts.add(restOfExp.substring(index, index + 1));
+                    restOfExp = restOfExp.substring(index + 1);
+                    index = -1;
+                }
+            }
+            ++index;
+            //Otherwise, the character is assumed to be a valid non-special character that is part of a user-defined
+            //double or complex. If it is invalid, a later validation sub-process will throw an exception.
+        }
+        parts.add(restOfExp);
+        return parts;
     }
 
     private boolean isBinaryOperator(char c)
@@ -765,6 +870,9 @@ public class FractalPanel extends JPanel
         return c == 'c' || c == 'f' || c == 'p' || c == 'u';
     }
 
+    /**
+     * A correct result is unlikely if this is called after setInfixListToPostfix.
+     */
     private boolean isDouble(String s)
     {
         char firstChar = s.charAt(0);
@@ -774,47 +882,23 @@ public class FractalPanel extends JPanel
             //s is one of the user-defined doubles
             return firstChar == 'D' || (this.isSpecialComplex(s.charAt(1)) && (firstChar == 'i' || firstChar == 'r'));
         }
+        else if(stringLength > 2)
+        {
+            //Could be 'r|[a complex]' or 'i|[a complex]'.
+            return ((firstChar == 'r' || firstChar == 'i') && s.charAt(1) == '|' && this.isComplex(s.substring(2)))
+                    //Could be 'a|[a double]
+                    || (firstChar == 'a' || s.charAt(1) == '|' && this.isDouble(s.substring(2)));
+        }
+        else if(stringLength >= 6)
+        {
+            //The double might be the internal representation of an expression for the result of two doubles and an
+            //operator, such as '0.5|0.8|+D', which can be generated in setInfixListToPostfix. In this case its minimum
+            //length is 6; if a result is a double it will end in D.
+            return s.charAt(stringLength - 1) == 'D';
+        }
         else
         {
-            //s may instead be a string that evaluates to a double.
-
-            //The result of a double, followed by a binary operator, followed by a double must be a double.
-            //Iterates through the string until a binary operator is found. If one is found, all characters before
-            //and after it are placed in a new array.
-            String[] possibleParts;
-            int x = 0;
-            boolean foundBinOp = false;
-            while (x < stringLength && !foundBinOp)
-            {
-                if (isBinaryOperator(s.charAt(x)))
-                {
-                    foundBinOp = true;
-                }
-                ++x;
-            }
-            if (foundBinOp) {
-                if (x == 1 || x == stringLength)
-                {
-                    //A binary operator was found at the beginning or end of the string, which is not permitted.
-                    return false;
-                }
-                else
-                {
-                    //The string has at least one binary operator, so the length of possibleParts is
-                    //2. The result of a double, followed by a binary operator, followed by a double is always a double.
-                    possibleParts = new String[]{s.substring(0, x - 1), s.substring(x)};
-                    return this.isDouble(possibleParts[0]) && this.isDouble(possibleParts[1]);
-                }
-            }
-            else
-            {
-                //The string has no binary operators.
-
-                //The result of 'a' followed by a double must be a double
-                return (firstChar == 'a' && this.isDouble(s.substring(1)) ||
-                        //This is also true for 'r' or 'i' followed by a Complex
-                        (this.isComplex(s.substring(1)) && (firstChar == 'r' || firstChar == 'i')));
-            }
+            return false;
         }
     }
 
@@ -822,6 +906,7 @@ public class FractalPanel extends JPanel
      * Non-special complexes are defined in instruction strings as [a,b], where and and b are valid doubles.
      * a is the real part and b is the coefficient of i in the imaginary part. The minimum length of such
      * complexes in instruction strings is 5, as in [0,0].
+     * A correct result is unlikely if this is called after setInfixListToPostfix.
      */
     private boolean isComplex(String s)
     {
@@ -835,75 +920,25 @@ public class FractalPanel extends JPanel
         {
             return s.charAt(0) == 'C';
         }
-        //Two complexes of any length must have a binary operator between them, so if the string is length 2 then
-        //that is invalid
-        else if(stringLength > 2)
+        else if(stringLength >= 3)
         {
-            //Checks if the first complex is special
-            if(isSpecialComplex(s.charAt(0)) && isBinaryOperator(s.charAt(1)) && isComplex(s.substring(2)))
+            //The string could be a user-defined complex, such as '0,0'. These have a minimum length of 3.
+            String[] possibleComplexParts = s.split(",");
+            if(possibleComplexParts.length == 2)
             {
-                return true;
+                return this.isDouble(possibleComplexParts[0]) && this.isDouble(possibleComplexParts[1]);
             }
-            else if(isComplex(s.substring(0, 2)) && isBinaryOperator(s.charAt(2)) && isComplex(s.substring(3)))
+            else
             {
-                return true;
+                return false;
             }
-            //Checks if the first complex is not special
-            //Using the example string "[$,rp]*[ip,$]*c"
-            else if(stringLength > 4)
-            {
-                if(s.charAt(0) == '[')
-                {
-                    //Searches for a ] in the expression
-                    int x = 0;
-                    boolean foundBracket = false;
-                    String[] fullComplexParts;
-                    while(x < stringLength && !foundBracket)
-                    {
-                        if (s.charAt(x) == ']')
-                        {
-                            foundBracket = true;
-                        }
-                        ++x;
-                    }
-                    if(foundBracket)
-                    {
-                        //There is a [ at the start and a ] at some point after it in this string.
-                        //Item 0 of the array is whatever is inside the square brackets.
-                        //Item 1 is the rest of the expression.
-                        if (x == stringLength)
-                        {
-                            //The candidate complex takes up the whole string.
-                            fullComplexParts = new String[]{s.substring(1, x - 1)};
-                        }
-                        else {
-                            //There are some characters left over to process
-                            //{"$,rp","*[ip,$]*c"}
-                            fullComplexParts = new String[]{s.substring(1, x - 1), s.substring(x)};
-                        }
-                    }
-                    else
-                    {
-                        //Candidate complex is invalid
-                        return false;
-                    }
-                    //{"$","rp"}
-                    String[] firstComplexParts = fullComplexParts[0].split(",");
-                    if(fullComplexParts.length == 1)
-                    {
-                                            //"$"                             //"rp"
-                        return isDouble(firstComplexParts[0]) && isDouble(firstComplexParts[1]);
-                    }
-                    else if(fullComplexParts.length == 2)
-                    {                                //"*"
-                        return isBinaryOperator(fullComplexParts[1].charAt(0))
-                                && isDouble(firstComplexParts[0])
-                                && isDouble(firstComplexParts[1])
-                                                                //"[ip,$]*c"
-                                &&isComplex(fullComplexParts[1].substring(1));
-                    }
-                }
-            }
+        }
+        else if(stringLength >= 6)
+        {
+            //The complex might be the internal representation of an expression for the result of two complexes and an
+            //operator, such as 'p,p,*C', which can be generated in setInfixListToPostfix. In this case its minimum
+            //length is 6; if a result is a complex it will end in C.
+            return s.charAt(stringLength - 1) == 'C';
         }
         return false;
     }

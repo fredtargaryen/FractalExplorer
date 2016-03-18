@@ -72,15 +72,15 @@ public class JuliaPanel extends FractalPanel
             catch(InvalidInstructionsException iie)
             {
                 this.rawInstructions = "";
-                this.processedFirstTerm = "";
-                this.processedNextTerm = "";
+                this.processedFirstTerm = new String[0];
+                this.processedNextTerm = new String[0];
             }
         }
         else
         {
             this.rawInstructions = "";
-            this.processedFirstTerm = "";
-            this.processedNextTerm = "";
+            this.processedFirstTerm = new String[0];
+            this.processedNextTerm = new String[0];
         }
     }
 }
